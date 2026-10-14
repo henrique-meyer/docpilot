@@ -1,6 +1,7 @@
 """Admin pages and /admin/api document routes."""
 
 from pathlib import Path
+from typing import Annotated
 
 from fastapi import APIRouter, BackgroundTasks, File, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
@@ -236,7 +237,7 @@ def list_documents(request: Request) -> Response:
 async def upload_document(
     request: Request,
     background: BackgroundTasks,
-    file: UploadFile | None = File(None),
+    file: Annotated[UploadFile | None, File()] = None,
     title: str = Form(""),
     year: str = Form(""),
     csrf: str = Form(""),
@@ -295,7 +296,7 @@ async def replace_document(
     document_id: str,
     request: Request,
     background: BackgroundTasks,
-    file: UploadFile | None = File(None),
+    file: Annotated[UploadFile | None, File()] = None,
     title: str = Form(""),
     year: str = Form(""),
     csrf: str = Form(""),

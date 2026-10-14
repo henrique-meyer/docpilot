@@ -73,14 +73,7 @@ def test_dotenv_fills_only_missing_names(tmp_path: Path, monkeypatch: MonkeyPatc
     monkeypatch.delenv("SESSION_SECRET", raising=False)
     monkeypatch.delenv("AZURE_STORAGE_CONTAINER", raising=False)
     (tmp_path / ".env").write_text(
-        "\n".join(
-            [
-                "# local only",
-                "ADMIN_PASSWORD_HASH=from-file",
-                "SESSION_SECRET=from-file",
-                'AZURE_STORAGE_CONTAINER="sources"',
-            ]
-        ),
+        '# local only\nADMIN_PASSWORD_HASH=from-file\nSESSION_SECRET=from-file\nAZURE_STORAGE_CONTAINER="sources"',
         encoding="utf-8",
     )
     settings = Settings.from_env()

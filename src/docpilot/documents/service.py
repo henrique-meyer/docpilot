@@ -1,8 +1,8 @@
 """Upload, replace, and delete source documents.
 
-Search indexing is not connected yet. A stored PDF is `ready`, its chunk count
-stays 0, and the 50 MB cap uses extracted text size. Old chunks are removed
-only after a new version is stored, which is a no-op until the index exists.
+A stored PDF is chunked and upserted. When Azure AI Search is not configured,
+chunks stay in a process-local index. Old chunk ids are removed only after the
+new chunks are upserted. The 50 MB cap uses extracted text size.
 """
 
 import logging
@@ -12,10 +12,11 @@ from dataclasses import replace
 from datetime import UTC, datetime
 
 from docpilot.config import Settings
-from docpilot.documents.errors import DocumentError, MESSAGES
+from docpilot.documents.errors import MESSAGES, DocumentError
 from docpilot.documents.models import AuditEvent, DocumentRecord
 from docpilot.documents.pdf import extract_pdf
 from docpilot.documents.store import DocumentStore
+from docpilot.ingest.pipeline import Ingestor, MemoryIndex
 
 logger = logging.getLogger(__name__)
 
@@ -25,9 +26,15 @@ def utc_now() -> str:
 
 
 class DocumentService:
-    def __init__(self, store: DocumentStore, settings: Settings) -> None:
+    def __init__(
+        self,
+        store: DocumentStore,
+        settings: Settings,
+        ingestor: Ingestor | None = None,
+    ) -> None:
         self.store = store
         self.settings = settings
+        self.ingestor = ingestor or Ingestor(None, MemoryIndex())
         self._lock = threading.Lock()
 
     def list_documents(self) -> list[DocumentRecord]:
@@ -88,9 +95,16 @@ class DocumentService:
             try:
                 info = extract_pdf(data)
                 self._ensure_capacity(info.index_bytes, excluding=None)
+                result = self.ingestor.ingest(
+                    data,
+                    document_id=document_id,
+                    title=record.title,
+                    source=record.source,
+                    year=record.year,
+                )
                 self.store.put_pdf(document_id, data)
                 record.pages = info.pages
-                record.chunk_count = 0
+                record.chunk_count = result.chunk_count
                 record.index_bytes = info.index_bytes
                 record.source_bytes = len(data)
                 record.ingested_at = utc_now()
@@ -117,7 +131,7 @@ class DocumentService:
             record = self.store.get_record(document_id)
             if record is None:
                 raise DocumentError("not_found")
-            self._delete_indexed_chunks(document_id)
+            self.ingestor.delete(document_id)
             self.store.delete_pdf(document_id)
             self.store.delete_record(document_id)
             self._audit("delete", document_id, record.title)
@@ -146,15 +160,18 @@ class DocumentService:
             try:
                 info = extract_pdf(data)
                 self._ensure_capacity(info.index_bytes, excluding=document_id)
-                # Store the new PDF first. Chunk deletion runs after that so a
-                # failed replace leaves the previous source in place. The index
-                # hook is empty until search ingestion exists.
-                self.store.put_pdf(document_id, data)
-                self._delete_indexed_chunks(document_id)
                 current.title = _clean(title, fallback=snapshot.title)
+                result = self.ingestor.ingest(
+                    data,
+                    document_id=document_id,
+                    title=current.title,
+                    source=current.source,
+                    year=_clean_year(year) if year is not None else snapshot.year,
+                )
+                self.store.put_pdf(document_id, data)
+                current.chunk_count = result.chunk_count
                 current.year = _clean_year(year) if year is not None else snapshot.year
                 current.pages = info.pages
-                current.chunk_count = 0
                 current.index_bytes = info.index_bytes
                 current.source_bytes = len(data)
                 current.ingested_at = utc_now()
@@ -181,10 +198,6 @@ class DocumentService:
     def _ensure_capacity(self, additional: int, excluding: str | None) -> None:
         if self.index_bytes_used(excluding=excluding) + additional > self.settings.index_limit_bytes:
             raise DocumentError("over_capacity")
-
-    def _delete_indexed_chunks(self, document_id: str) -> None:
-        """Remove search chunks for this document once the index exists."""
-        del document_id
 
     def _audit(self, action: str, document_id: str | None, detail: str | None) -> None:
         stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S%f")

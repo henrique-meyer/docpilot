@@ -1,11 +1,15 @@
 """Runtime settings. Secrets come from the environment, never from git."""
 
+from __future__ import annotations
+
 import os
 from dataclasses import dataclass
 from pathlib import Path
 
 INDEX_LIMIT_BYTES = 50 * 1024 * 1024
 MAX_UPLOAD_BYTES = 25 * 1024 * 1024
+DEFAULT_CHUNK_TOKENS = 700
+DEFAULT_OVERLAP_TOKENS = 80
 
 
 def load_dotenv(path: Path | None = None) -> None:
@@ -52,6 +56,12 @@ class Settings:
     data_dir: Path
     max_upload_bytes: int = MAX_UPLOAD_BYTES
     index_limit_bytes: int = INDEX_LIMIT_BYTES
+    openai_endpoint: str = ""
+    search_endpoint: str = ""
+    embedding_deployment: str = "text-embedding-3-small"
+    search_index: str = "docpilot"
+    chunk_tokens: int = DEFAULT_CHUNK_TOKENS
+    overlap_tokens: int = DEFAULT_OVERLAP_TOKENS
     session_max_age: int = 8 * 60 * 60
     login_max_failures: int = 5
     login_window_seconds: int = 15 * 60
@@ -75,4 +85,13 @@ class Settings:
             data_dir=Path(os.environ.get("DOCPILOT_DATA_DIR", ".data")),
             max_upload_bytes=_int("DOCPILOT_MAX_UPLOAD_BYTES", MAX_UPLOAD_BYTES),
             index_limit_bytes=_int("DOCPILOT_INDEX_LIMIT_BYTES", INDEX_LIMIT_BYTES),
+            openai_endpoint=os.environ.get("AZURE_OPENAI_ENDPOINT", "").strip(),
+            search_endpoint=os.environ.get("AZURE_SEARCH_ENDPOINT", "").strip(),
+            embedding_deployment=os.environ.get(
+                "AZURE_OPENAI_EMBEDDING_DEPLOYMENT", "text-embedding-3-small"
+            ).strip()
+            or "text-embedding-3-small",
+            search_index=os.environ.get("AZURE_SEARCH_INDEX", "docpilot").strip() or "docpilot",
+            chunk_tokens=_int("DOCPILOT_CHUNK_TOKENS", DEFAULT_CHUNK_TOKENS),
+            overlap_tokens=_int("DOCPILOT_OVERLAP_TOKENS", DEFAULT_OVERLAP_TOKENS),
         )

@@ -250,6 +250,22 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
               value: sources.name
             }
             {
+              name: 'AZURE_OPENAI_ENDPOINT'
+              value: openai.properties.endpoint
+            }
+            {
+              name: 'AZURE_OPENAI_EMBEDDING_DEPLOYMENT'
+              value: embeddingDeployment.name
+            }
+            {
+              name: 'AZURE_SEARCH_ENDPOINT'
+              value: 'https://${search.name}.search.windows.net'
+            }
+            {
+              name: 'AZURE_SEARCH_INDEX'
+              value: 'docpilot'
+            }
+            {
               name: 'DOCPILOT_COOKIE_SECURE'
               value: 'true'
             }

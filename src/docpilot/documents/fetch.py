@@ -53,7 +53,7 @@ def _require_public_http(url: str) -> None:
         raise DocumentError("download_failed") from exc
     for info in addresses:
         address = info[4][0]
-        if _is_blocked_ip(address):
+        if isinstance(address, str) and _is_blocked_ip(address):
             raise DocumentError("bad_url")
 
 

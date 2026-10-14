@@ -5,7 +5,7 @@
   <div class="top">
     <div>
       <h1>Documents</h1>
-      <p>Uploads are stored for later ingestion. Search indexing is not connected yet, so chunk count stays 0. The bar uses extracted text size against the 50 MB Free-tier limit.</p>
+      <p>Uploads are stored, chunked, and indexed when Azure AI Search is configured. The bar uses extracted text size against the 50 MB Free-tier limit.</p>
     </div>
     <form method="post" action="/admin/logout">
       <input type="hidden" name="csrf" value="{{ csrf }}">
