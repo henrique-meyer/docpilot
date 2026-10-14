@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DocPilot</title>
+  <link rel="icon" href="/assets/logo.svg" type="image/svg+xml">
+  <style>
+    :root {
+      color-scheme: light;
+      --navy: #0C2340;
+      --paper: #F4F0E6;
+      --card: #fffdf9;
+      --ink: #1c1915;
+      --muted: #5c564c;
+      --line: #e4ddd2;
+      --gold: #F6C43A;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font: 17px/1.5 "Segoe UI", system-ui, sans-serif;
+      color: var(--ink);
+      background: var(--paper);
+    }
+    header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 16px 20px;
+      background: var(--navy);
+      color: var(--paper);
+    }
+    header img { width: 36px; height: 36px; }
+    header strong { font-size: 1.15rem; }
+    main { max-width: 760px; margin: 0 auto; padding: 28px 20px 64px; }
+    form, .card, .answer {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 16px;
+    }
+    textarea {
+      width: 100%;
+      min-height: 96px;
+      margin: 8px 0 12px;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      font: inherit;
+      resize: vertical;
+    }
+    button {
+      font: inherit;
+      border: 0;
+      border-radius: 8px;
+      padding: 8px 14px;
+      background: var(--navy);
+      color: var(--paper);
+      cursor: pointer;
+    }
+    .disclaimer { color: var(--muted); font-size: 0.92rem; }
+    .answer { margin-top: 16px; white-space: pre-wrap; }
+    .citation { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+    .citation strong { display: block; }
+    .hidden { display: none; }
+    .status { margin-top: 12px; color: var(--muted); }
+  </style>
+</head>
+<body>
+  <header>
+    <img src="/assets/logo.svg" alt="">
+    <strong>DocPilot</strong>
+  </header>
+  <main>
+    <form id="ask">
+      <label for="question">Ask about the uploaded documents</label>
+      <textarea id="question" name="question" maxlength="1000" required></textarea>
+      <button type="submit">Ask</button>
+      <p class="disclaimer">Answers come from the uploaded documents and are informational only.</p>
+    </form>
+    <p id="status" class="status hidden"></p>
+    <section id="result" class="answer hidden"></section>
+  </main>
+  <script>
+    const form = document.getElementById("ask");
+    const status = document.getElementById("status");
+    const result = document.getElementById("result");
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      status.classList.remove("hidden");
+      status.textContent = "Looking through the documents…";
+      result.classList.add("hidden");
+      result.textContent = "";
+      const question = document.getElementById("question").value;
+      let body = {};
+      try {
+        const response = await fetch("/ask", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Accept": "application/json" },
+          body: JSON.stringify({ question })
+        });
+        body = await response.json();
+      } catch (error) {
+        status.textContent = "The question could not be answered.";
+        return;
+      }
+      const messages = {
+        question_too_long: "That question is too long.",
+        rate_limited: "Too many questions. Wait a moment and try again.",
+        question_required: "Enter a question.",
+        unavailable: "The question could not be answered."
+      };
+      status.classList.add("hidden");
+      result.classList.remove("hidden");
+      const answer = document.createElement("p");
+      answer.textContent = body.answer || messages[body.error] || "No answer.";
+      result.appendChild(answer);
+      for (const citation of body.citations || []) {
+        const block = document.createElement("div");
+        block.className = "citation";
+        const title = document.createElement("strong");
+        const year = citation.year ? `, ${citation.year}` : "";
+        title.textContent = `${citation.doc} — ${citation.section}, p. ${citation.page}${year}`;
+        const snippet = document.createElement("p");
+        snippet.textContent = citation.snippet || "";
+        block.appendChild(title);
+        block.appendChild(snippet);
+        result.appendChild(block);
+      }
+    });
+  </script>
+</body>
+</html>
