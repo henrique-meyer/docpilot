@@ -225,3 +225,7 @@ __marimo__/
 
 # Compiled Bicep
 infra/main.json
+
+# Sample PDFs are downloaded by the seed or ingest script. The catalog is committed.
+sample-docs/**/*.pdf
+!sample-docs/**/SOURCES.md
