@@ -47,6 +47,8 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      # This account uses GitHub's unique OIDC subject, so the Entra
+      # federated credential subject includes the owner and repo ids.
       - uses: azure/login@v2
         with:
           client-id: 17e5dffa-f6e7-4468-9592-d18632691dcf
