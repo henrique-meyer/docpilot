@@ -222,6 +222,7 @@ __marimo__/
 # Local planning inputs (not published)
 /requirements.md
 /infrastructure.md
+/AGENTS.md
 
 # Compiled Bicep
 infra/main.json
