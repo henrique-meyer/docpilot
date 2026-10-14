@@ -6,7 +6,8 @@ FROM python:3.12-slim AS build
 WORKDIR /app
 COPY pyproject.toml README.md ./
 COPY src ./src
-RUN pip install --no-cache-dir .
+RUN pip install --no-cache-dir . \
+ && python -c "import docpilot"
 
 # Stage 2 is the runtime. It copies the installed packages only, so build tools
 # never ship. The process runs as a non-root user.

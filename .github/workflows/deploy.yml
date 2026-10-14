@@ -73,7 +73,7 @@ jobs:
             --subscription "$AZURE_SUBSCRIPTION_ID" \
             --resource-group "$AZURE_RESOURCE_GROUP" \
             --name ca-docpilot-prod \
-            --image "ghcr.io/henrique-meyer/docpilot:prod"
+            --image "ghcr.io/henrique-meyer/docpilot:sha-${{ github.sha }}"
           az containerapp ingress update \
             --subscription "$AZURE_SUBSCRIPTION_ID" \
             --resource-group "$AZURE_RESOURCE_GROUP" \
