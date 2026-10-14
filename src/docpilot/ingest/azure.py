@@ -6,6 +6,8 @@ The container app uses its managed identity. Tests never construct this module's
 from docpilot.ingest.chunk import Chunk
 from docpilot.ingest.pipeline import VECTOR_DIMENSIONS
 
+SEMANTIC_CONFIG = "docpilot-semantic"
+
 
 class AzureEmbedder:
     def __init__(self, endpoint: str, deployment: str) -> None:
@@ -94,6 +96,10 @@ class AzureChunkIndex:
             SearchField,
             SearchFieldDataType,
             SearchIndex,
+            SemanticConfiguration,
+            SemanticField,
+            SemanticPrioritizedFields,
+            SemanticSearch,
             VectorSearch,
             VectorSearchProfile,
         )
@@ -142,8 +148,22 @@ class AzureChunkIndex:
                     )
                 ],
             ),
+            semantic_search=SemanticSearch(
+                configurations=[
+                    SemanticConfiguration(
+                        name=SEMANTIC_CONFIG,
+                        prioritized_fields=SemanticPrioritizedFields(
+                            title_field=SemanticField(field_name="title"),
+                            content_fields=[SemanticField(field_name="content")],
+                            keywords_fields=[SemanticField(field_name="section")],
+                        ),
+                    )
+                ]
+            ),
         )
         try:
+            # Leave an existing index alone. Retrieval falls back to hybrid
+            # when this semantic configuration is not on the service yet.
             client.get_index(self._index_name)  # type: ignore[attr-defined]
         except ResourceNotFoundError:
             client.create_index(index)  # type: ignore[attr-defined]

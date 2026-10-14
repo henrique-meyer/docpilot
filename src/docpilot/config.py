@@ -66,6 +66,8 @@ class Settings:
     login_max_failures: int = 5
     login_window_seconds: int = 15 * 60
     login_lock_seconds: int = 15 * 60
+    retrieval_top_k: int = 8
+    retrieval_token_budget: int = 3000
 
     @property
     def admin_configured(self) -> bool:
@@ -94,4 +96,6 @@ class Settings:
             search_index=os.environ.get("AZURE_SEARCH_INDEX", "docpilot").strip() or "docpilot",
             chunk_tokens=_int("DOCPILOT_CHUNK_TOKENS", DEFAULT_CHUNK_TOKENS),
             overlap_tokens=_int("DOCPILOT_OVERLAP_TOKENS", DEFAULT_OVERLAP_TOKENS),
+            retrieval_top_k=_int("DOCPILOT_RETRIEVAL_TOP_K", 8),
+            retrieval_token_budget=_int("DOCPILOT_RETRIEVAL_TOKEN_BUDGET", 3000),
         )
