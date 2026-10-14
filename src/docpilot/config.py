@@ -68,6 +68,11 @@ class Settings:
     login_lock_seconds: int = 15 * 60
     retrieval_top_k: int = 8
     retrieval_token_budget: int = 3000
+    chat_deployment: str = "gpt-4.1-mini"
+    max_question_chars: int = 1000
+    ask_rate_limit: int = 30
+    ask_rate_window_seconds: int = 60
+    daily_token_cap: int = 20000
 
     @property
     def admin_configured(self) -> bool:
@@ -98,4 +103,10 @@ class Settings:
             overlap_tokens=_int("DOCPILOT_OVERLAP_TOKENS", DEFAULT_OVERLAP_TOKENS),
             retrieval_top_k=_int("DOCPILOT_RETRIEVAL_TOP_K", 8),
             retrieval_token_budget=_int("DOCPILOT_RETRIEVAL_TOKEN_BUDGET", 3000),
+            chat_deployment=os.environ.get("AZURE_OPENAI_CHAT_DEPLOYMENT", "gpt-4.1-mini").strip()
+            or "gpt-4.1-mini",
+            max_question_chars=_int("DOCPILOT_MAX_QUESTION_CHARS", 1000),
+            ask_rate_limit=_int("DOCPILOT_ASK_RATE_LIMIT", 30),
+            ask_rate_window_seconds=_int("DOCPILOT_ASK_RATE_WINDOW_SECONDS", 60),
+            daily_token_cap=_int("DOCPILOT_DAILY_TOKEN_CAP", 20000),
         )

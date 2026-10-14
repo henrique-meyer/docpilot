@@ -258,6 +258,10 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
               value: embeddingDeployment.name
             }
             {
+              name: 'AZURE_OPENAI_CHAT_DEPLOYMENT'
+              value: chatDeployment.name
+            }
+            {
               name: 'AZURE_SEARCH_ENDPOINT'
               value: 'https://${search.name}.search.windows.net'
             }
