@@ -29,6 +29,20 @@ DocPilot was built with an **AI-native development workflow**: AI agents do much
 ## Tech stack
 Python 3.12 · FastAPI · Microsoft Agent Framework · Azure OpenAI · Azure AI Search · LangChain (baseline) · OpenTelemetry · Docker · Azure Container Apps · Azure Key Vault · GitHub Actions · Jira · Cursor · Grok Bot
 
+## Azure resources
+One resource group, in East US 2. The group name, subscription, and any custom domain stay out of this repo.
+
+- Azure OpenAI, with a chat deployment (`gpt-4.1-mini`) and an embeddings deployment (`text-embedding-3-small` at 512 dimensions)
+- Azure AI Search on the Free tier, in East US, because East US 2 had no free-tier capacity
+- A storage account with shared keys disabled, and one private blob container for source PDFs
+- Key Vault, for the admin password hash and the session secret
+- Log Analytics and Application Insights
+- A Container Apps environment and one Container App on the Consumption plan, scaled to zero
+- A system-assigned managed identity, with data roles on OpenAI, Search, Key Vault, and Blob Storage
+- A $10 budget alert on the resource group
+
+Container images are published to GitHub Container Registry. There is no Azure Container Registry.
+
 ## Status
 In active development. Architecture, setup, eval results, and a walkthrough will be added as the build progresses.
 
