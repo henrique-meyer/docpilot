@@ -1,0 +1,12 @@
+using 'main.bicep'
+
+// Copy to infra/main.bicepparam and fill the private values there.
+// That file is gitignored. Do not put the subscription, domain, or alert email in git.
+
+param location = 'eastus2'
+param searchLocation = 'eastus'
+param budgetContactEmail = ''
+param targetPort = 8000
+param healthPath = '/health'
+param customDomainName = ''
+param customDomainCertificateId = ''

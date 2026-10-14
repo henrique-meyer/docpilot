@@ -1,17 +1,26 @@
 [project]
 name = "docpilot"
 version = "0.1.0"
-description = "RAG and agent assistant over public NIST documents."
+description = "Document-agnostic RAG and agent assistant."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+  "argon2-cffi>=23.1",
+  "azure-identity>=1.19",
+  "azure-search-documents>=11.6",
+  "azure-storage-blob>=12.24",
   "fastapi>=0.115",
+  "httpx>=0.27",
+  "itsdangerous>=2.2",
+  "jinja2>=3.1",
+  "openai>=1.55",
+  "pypdf>=5.1",
+  "python-multipart>=0.0.12",
   "uvicorn>=0.32",
 ]
 
 [dependency-groups]
 dev = [
-  "httpx>=0.27",
   "mypy>=1.13",
   "pytest>=8",
   "ruff>=0.7",
@@ -40,3 +49,7 @@ python_version = "3.12"
 strict = true
 mypy_path = "src"
 packages = ["docpilot"]
+
+[[tool.mypy.overrides]]
+module = ["azure.*", "openai"]
+ignore_missing_imports = true

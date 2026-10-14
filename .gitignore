@@ -222,6 +222,7 @@ __marimo__/
 # Local planning inputs (not published)
 /requirements.md
 /infrastructure.md
+/AGENTS.md
 
 # Compiled Bicep
 infra/main.json
@@ -229,3 +230,8 @@ infra/main.json
 # Sample PDFs are downloaded by the seed or ingest script. The catalog is committed.
 sample-docs/**/*.pdf
 !sample-docs/**/SOURCES.md
+# Local Azure parameters: subscription, domain, alert email. Not published.
+infra/main.bicepparam
+
+# Local admin uploads when Azure Blob is not configured
+.data/

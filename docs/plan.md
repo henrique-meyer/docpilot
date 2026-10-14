@@ -2,7 +2,7 @@
 
 The whole build is due **Thursday 15 October 2026**. The eighteen stories below are one Thursday sequence in dependency order, not a Friday–Sunday split. Architecture is in [architecture.md](architecture.md).
 
-No Azure resource is created, no `az deployment` is run, and no DNS name is bound until the owner approves spend. Story 5 adds Bicep only. Story 13 may add the deploy workflow. Running that workflow waits for a separate yes.
+Sample PDFs live in git so an admin can upload them by hand. They are excluded from the image and are not loaded into the running app. Blob Storage for those source files is part of the deployed stack.
 
 ## Definition of done
 
@@ -16,7 +16,7 @@ Stories are implemented in key order, skipping ahead only when the dependency li
 flowchart TD
   s1[DOCPILOT-1 skeleton]
   s2[DOCPILOT-2 Docker]
-  s3[DOCPILOT-3 corpus]
+  s3[DOCPILOT-3 sample sets]
   s4[DOCPILOT-4 ingest]
   s5[DOCPILOT-5 Bicep]
   s6[DOCPILOT-6 retriever]
@@ -81,11 +81,11 @@ Multi-stage Dockerfile, non-root user, Compose for the API plus Jaeger, and `doc
 
 Blocked by DOCPILOT-1. Blocks DOCPILOT-12.
 
-### DOCPILOT-3 — IRS corpus download
+### DOCPILOT-3 — Sample sets and seed command
 
 Due Thursday 15 October 2026.
 
-Download the current-tax-year IRS publications: Pub 17 (Your Federal Income Tax), 501 (Dependents, Standard Deduction, Filing Info), 502 (Medical and Dental Expenses), 523 (Selling Your Home), 587 (Business Use of Your Home), 590-A and 590-B (IRAs), 970 (Tax Benefits for Education), and 334 (Tax Guide for Small Business). Record the source URLs and the tax year in `data/SOURCES.md`. Do not commit large PDFs. If the set will not fit the 50 MB Free-tier index, drop documents until it does.
+DocPilot does not hard-code a corpus. Commit `sample-docs/{irs,nps,fema,ssa-medicare}/` with a `SOURCES.md` (title, URL, date or tax year, license note) and the sample PDFs. The PDFs stay out of the image. An admin uploads the ones to try. `make seed SET=irs` uses the same ingestion path when a local run needs the IRS set. CI evals use that set.
 
 Blocked by DOCPILOT-1. Blocks DOCPILOT-4.
 
@@ -93,7 +93,7 @@ Blocked by DOCPILOT-1. Blocks DOCPILOT-4.
 
 Due Thursday 15 October 2026.
 
-Parse PDFs, keep title, section, and page, chunk at 500–800 tokens with configurable overlap, embed with `text-embedding-3-small` at 512 dimensions, and upsert a hybrid index with stable chunk IDs. Unit tests mock the network. The live upload waits until an index exists, which waits on owner approval of spend.
+Parse PDFs, keep title, section, and page, chunk at 500–800 tokens with configurable overlap, embed with `text-embedding-3-small` at 512 dimensions, and upsert a hybrid index with stable chunk IDs. This is the only ingest path. Admin uploads and `make seed` both use it. Unit tests mock the network. The live upload waits until an index exists.
 
 Blocked by DOCPILOT-3. Live upload is also blocked by DOCPILOT-5.
 
@@ -101,7 +101,7 @@ Blocked by DOCPILOT-3. Live upload is also blocked by DOCPILOT-5.
 
 Due Thursday 15 October 2026.
 
-Bicep for Azure AI Search Free, Azure OpenAI, Key Vault, Blob Storage for source PDFs, Container Apps Consumption, a $10 budget alert, and the GitHub OIDC app, in resource group `hmeyer-docpilot`, East US 2. Key Vault has a slot for the admin password hash. The hash value is not in git or in the template. Review `what-if` only after the owner approves a read of the subscription. This story does not apply the deployment.
+Bicep for Azure AI Search Free, Azure OpenAI, Key Vault, Blob Storage for source PDFs, Container Apps Consumption, a $10 budget alert, and the GitHub OIDC app, in the DocPilot resource group, East US 2. Key Vault has a slot for the admin password hash. The hash value is not in git or in the template. Blob Storage is account `stdocpilotprod`, container `sources`, with Storage Blob Data Contributor on the Container App identity. Subscription, domain, and alert email stay in the gitignored parameter file.
 
 Blocks the live index use inside DOCPILOT-4, and blocks DOCPILOT-13.
 
@@ -117,7 +117,7 @@ Blocked by DOCPILOT-1. Blocks DOCPILOT-7.
 
 Due Thursday 15 October 2026.
 
-`POST /ask` returns the answer, citations (`doc`, `tax_year`, `section`, `page`, `snippet`), and `trace_id`. `GET /health` and `/docs`. One static page shows the citations and a disclaimer that the answer is informational only, not tax advice. Grounded answers only. Unsupported questions say "not found in the documents".
+`POST /ask` returns the answer, citations (`doc`, `section`, `page`, `snippet`), and `trace_id`. `GET /health` and `/docs`. One static page shows the citations and a disclaimer that answers come from the uploaded documents and are informational only. Grounded answers only. Unsupported questions say "not found in the documents". Per-IP rate limiting, a maximum question length, and a global daily token cap return "demo limit reached" when the cap is hit. The same limits cover `/agent`.
 
 Blocked by DOCPILOT-6. Blocks DOCPILOT-8 and DOCPILOT-10.
 
@@ -125,7 +125,7 @@ Blocked by DOCPILOT-6. Blocks DOCPILOT-8 and DOCPILOT-10.
 
 Due Thursday 15 October 2026.
 
-Thirty golden questions and ten red-team prompts. The golden set includes questions that need more than one publication. Metrics: correctness, citation accuracy, groundedness, red-team pass rate, latency, and token cost. Thresholds in config. Non-zero exit on failure. Markdown and JSON reports.
+Thirty golden questions in `eval/irs/golden.jsonl` and ten red-team prompts. Other sample sets use `eval/<set>/golden.jsonl`. The IRS golden set includes questions that need more than one document. Metrics: correctness, citation accuracy, groundedness, red-team pass rate, latency, and token cost. Thresholds in config. Non-zero exit on failure. Markdown and JSON reports. CI runs the IRS set.
 
 Blocked by DOCPILOT-7. Blocks DOCPILOT-9 and DOCPILOT-11.
 
@@ -133,7 +133,7 @@ Blocked by DOCPILOT-7. Blocks DOCPILOT-9 and DOCPILOT-11.
 
 Due Thursday 15 October 2026.
 
-GitHub Actions on pull requests: lint, typecheck, unit tests, Docker build, and the eval gate.
+GitHub Actions on pull requests: lint, typecheck, unit tests, Docker build, and the eval gate against `eval/irs/golden.jsonl`.
 
 Blocked by DOCPILOT-8. Blocks DOCPILOT-13.
 
@@ -141,7 +141,7 @@ Blocked by DOCPILOT-8. Blocks DOCPILOT-13.
 
 Due Thursday 15 October 2026.
 
-`POST /agent` on `agent-framework-core`. Confirm the tool API from the official Python docs before coding. Tools: `search_documents`, `get_section`, `compare_publications` (what several publications say about one topic, for example home office rules in Pub 587 and Pub 334). Return tool calls. Cap tool calls, enforce a timeout, and refuse out-of-scope or unsafe requests.
+`POST /agent` on `agent-framework-core`. Confirm the tool-calling API from the official Python docs before coding. Do not reuse Semantic Kernel names. Tools: `search_documents`, `get_section`, `compare_documents` (what several uploaded documents say about one topic, for example home office rules in IRS Pub 587 and Pub 334). Return tool calls. Cap tool calls, enforce a timeout, and refuse out-of-scope or unsafe requests. Honor the rate limit, question-length limit, and daily token cap from DOCPILOT-7.
 
 Blocked by DOCPILOT-7. Blocks DOCPILOT-15.
 
@@ -173,7 +173,7 @@ Blocked by DOCPILOT-5 and DOCPILOT-9. Blocks DOCPILOT-14.
 
 Due Thursday 15 October 2026.
 
-Print the CNAME `docpilot` and the TXT `asuid.docpilot`. Bind the managed certificate only after the owner confirms DNS. Production URL: `https://docpilot.hmeyer.dev`.
+Print the CNAME and TXT records for the custom domain. Bind the managed certificate only after the owner confirms DNS. The production hostname is a deploy-time value, kept outside git.
 
 Blocked by DOCPILOT-13. Blocks DOCPILOT-15.
 
@@ -181,7 +181,7 @@ Blocked by DOCPILOT-13. Blocks DOCPILOT-15.
 
 Due Thursday 15 October 2026.
 
-README with a diagram, local and Azure quickstart, eval table, design tradeoffs, cost, teardown (`az group delete --name hmeyer-docpilot`), the admin page, and a note that Cursor was used. `docs/walkthrough.md` is a 5–7 minute script. Short ADRs for Container Apps, plain-code retrieval, and Agent Framework plus the LangChain comparison. One historical pull request fails eval on purpose and is then fixed.
+README with a diagram, local and Azure quickstart, eval table, design tradeoffs, cost, teardown (`az group delete --name <resource-group>`), the admin page, and a note that Cursor was used. `docs/walkthrough.md` is a 5–7 minute script. Short ADRs for Container Apps, plain-code retrieval, and Agent Framework plus the LangChain comparison. One historical pull request fails eval on purpose and is then fixed.
 
 Blocked by DOCPILOT-10, DOCPILOT-11, DOCPILOT-12, DOCPILOT-14, and DOCPILOT-18.
 
@@ -197,7 +197,7 @@ Blocked by DOCPILOT-7. The live password secret is also blocked by DOCPILOT-5. B
 
 Due Thursday 15 October 2026.
 
-List indexed documents: title, source, tax year, pages, chunk count, ingested date, status. Upload a PDF with a size limit and a PDF type check, or add a document by URL. Ingestion runs in the API process as a background job with status queued, processing, ready, or failed. The page shows index size against the 50 MB Free-tier limit and blocks an upload that would exceed it.
+List indexed documents: title, source, year when present, pages, chunk count, ingested date, status. Upload a PDF with a size limit and a PDF type check, or add a document by URL. Ingestion runs in the API process as a background job with status queued, processing, ready, or failed, on the same path as `make seed`. The page shows index size against the 50 MB Free-tier limit and blocks an upload that would exceed it.
 
 Blocked by DOCPILOT-16 and DOCPILOT-4. Blocks DOCPILOT-18.
 
@@ -215,7 +215,7 @@ Blocked by DOCPILOT-17. Live blob is also blocked by DOCPILOT-5. Blocks DOCPILOT
 | --- | --- | --- | --- |
 | DOCPILOT-1 | Python 3.12 skeleton | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-1 |
 | DOCPILOT-2 | Docker image, Compose, and primer | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-2 |
-| DOCPILOT-3 | IRS corpus download | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-3 |
+| DOCPILOT-3 | Sample sets and seed command | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-3 |
 | DOCPILOT-4 | Ingestion | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-4 |
 | DOCPILOT-5 | Bicep, no apply | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-5 |
 | DOCPILOT-6 | Hybrid retriever and prompt | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-6 |
