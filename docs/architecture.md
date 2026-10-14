@@ -1,14 +1,14 @@
 # DocPilot architecture
 
-DocPilot is a small AI document assistant over current-tax-year IRS publications. A visitor asks a question in a browser or over HTTP. The service either answers from retrieved passages or, for harder questions, calls tools through Microsoft Agent Framework. Every claim is cited. An eval harness gates pull requests. The running service is a container, local or on Azure Container Apps.
+DocPilot is a document-agnostic assistant. A visitor asks a question in a browser or over HTTP. The service answers from whatever an admin has uploaded, or, for harder questions, calls tools through Microsoft Agent Framework. Every claim is cited. An eval harness gates pull requests. The running service is a container, local or on Azure Container Apps.
 
-The target date for the whole build is **Thursday 15 October 2026**. Work is one sequenced day, not a Friday–Sunday split. Nothing in Azure is created until the owner approves spend.
+The target date for the whole build is **Thursday 15 October 2026**. Work is one sequenced day, not a Friday–Sunday split. No further Azure resources are created until the owner approves. Blob Storage for source PDFs is in the design and is not provisioned by this change.
 
-[requirements.md](../requirements.md) is the source of truth. The README and the stack line in `infrastructure.md` still say Semantic Kernel. That name is historical. The Python successor is Microsoft Agent Framework.
+[requirements.md](../requirements.md) is the source of truth. The README notes that [Microsoft Agent Framework](https://github.com/microsoft/agent-framework) is the successor to Semantic Kernel. The package is `agent-framework-core`.
 
 ## Who it is for
 
-A visitor asking everyday questions about current-tax-year IRS publications: Pub 17, 501, 502, 523, 587, 590-A, 590-B, 970, and 334. Answers are informational only, not tax advice. The set is public domain and is trimmed so the index fits 50 MB. Public question answering stays anonymous. One admin password protects `/admin`, where documents can be listed, uploaded, replaced, and deleted. There are no public accounts and no per-document access control. Kubernetes and Databricks are out of scope. AKS is only a later scaling note.
+A visitor asking questions about the documents an admin has uploaded. Nothing in the product hard-codes a corpus. Answers are informational only. The repo ships public-domain sample sets so a reviewer can seed a corpus locally: IRS publications, National Park Service visitor guides, FEMA / Ready.gov guides, and Social Security and Medicare handbooks, each under `sample-docs/<set>/` with a `SOURCES.md`. `make seed SET=irs` loads one set through the same ingestion path as an admin upload. The live index must stay inside 50 MB. Public question answering stays anonymous. One admin password protects `/admin`, where documents can be listed, uploaded, replaced, and deleted. There are no public accounts and no per-document access control. Kubernetes and Databricks are out of scope. AKS is only a later scaling note.
 
 ## Shape
 
@@ -19,7 +19,7 @@ flowchart LR
   api --> ingest[Ingest script and admin job]
   api --> rag[Hybrid retriever]
   api --> agent[Agent Framework]
-  agent --> tools[search_documents get_section compare_publications]
+  agent --> tools[search_documents get_section compare_documents]
   tools --> rag
   rag --> search[Azure AI Search Free]
   rag --> aoai[Azure OpenAI East US 2]
@@ -37,7 +37,7 @@ Two question paths share one retriever:
 1. `POST /ask` runs retrieval and one grounded completion. The prompt is plain code, not a framework chain.
 2. `POST /agent` runs Microsoft Agent Framework with three tools. The response includes the tool calls so the reasoning is auditable.
 
-Ingestion is a script for the initial corpus and a background job for admin uploads. Both parse PDFs, chunk them, embed them, and upsert the index. Source files live in Blob Storage, or in Azurite when running Compose.
+Ingestion is one path. Admin uploads and `make seed SET=irs` both call it. It parses PDFs, chunks them, embeds them, and upserts the index. Source files live in Blob Storage, or in Azurite when running Compose. That storage account is not created until the owner approves.
 
 ## Repo layout
 
@@ -45,17 +45,18 @@ Ingestion is a script for the initial corpus and a background job for admin uplo
 | --- | --- |
 | `src/` | FastAPI app, retriever, prompts, agent |
 | `ingest/` | PDF download, parse, chunk, embed, upsert |
-| `eval/` | Golden set, red-team prompts, harness, LangChain baseline |
+| `eval/<set>/` | Golden questions for one sample set. CI uses `eval/irs/golden.jsonl` |
+| `eval/` | Red-team prompts, harness, LangChain baseline |
 | `infra/` | Bicep |
+| `sample-docs/<set>/` | Public-domain samples and `SOURCES.md`. PDFs are downloaded, not committed |
 | `tests/` | Unit tests. LLM and Search calls are mocked |
 | `docs/` | Architecture, Docker primer, walkthrough, decision records |
-| `data/SOURCES.md` | URLs and tax year for the IRS PDFs. Large PDFs are downloaded, not committed |
 
 ## Ingestion and the index
 
-Source PDFs are public-domain IRS publications. A script downloads them from irs.gov. URLs and the tax year live in `data/SOURCES.md`. Drop a publication if the index would exceed the Free tier's 50 MB.
+The live corpus is whatever the admin uploads. Sample catalogs record title, URL, date or tax year, and a license note in `sample-docs/<set>/SOURCES.md`. A download script fetches large PDFs. Only public-domain or clearly reusable files are allowed. An upload that would push the index past 50 MB is refused.
 
-Each chunk keeps the document title, tax year, section heading, and page number. Chunks are about 500–800 tokens with overlap. Size and overlap are configuration. Chunk IDs are stable, so a re-run upserts instead of duplicating.
+Each chunk keeps the document title, section heading, and page number. A year is stored when the document has one. Chunks are about 500–800 tokens with overlap. Size and overlap are configuration. Chunk IDs are stable, so a re-run upserts instead of duplicating.
 
 Embeddings use `text-embedding-3-small` at **512 dimensions**. That is shorter than the model's default and keeps the Free-tier index small.
 
@@ -66,8 +67,8 @@ One Azure AI Search index, Free tier (50 MB, 3 indexes, $0). East US 2 had no fr
 | `id` | Stable chunk ID, key |
 | `content` | Chunk text, searchable |
 | `content_vector` | 512-dimensional vector |
-| `doc` | Publication title, filterable |
-| `tax_year` | Tax year of the publication, filterable |
+| `doc` | Document title, filterable |
+| `year` | Tax year or publication year when the document has one, filterable |
 | `section` | Section heading, filterable |
 | `page` | Page number, filterable |
 
@@ -75,17 +76,19 @@ Retrieval is hybrid: keyword plus vector. Semantic ranker stays on the **free** 
 
 ## RAG question answering
 
-`POST /ask` accepts `{ "question": "..." }` and returns `{ "answer", "citations": [{ "doc", "tax_year", "section", "page", "snippet" }], "trace_id" }`.
+`POST /ask` accepts `{ "question": "..." }` and returns `{ "answer", "citations": [{ "doc", "section", "page", "snippet" }], "trace_id" }`. A year is included when the source document has one.
 
 The retriever is readable Python: hybrid search, top-k, optional semantic rerank. Context engineering is explicit: a token budget, deduplication, and a stable order. The prompt template is a versioned file in the repo. The model may answer only from that context, must cite every claim, and must say "not found in the documents" when the context does not support an answer.
 
-`GET /health` and the OpenAPI page at `/docs` are required. A single static HTML page sends a question, shows the citations (publication, tax year, and page), and states that the answer is informational only, not tax advice.
+`GET /health` and the OpenAPI page at `/docs` are required. A single static HTML page sends a question, shows the citations, and states that answers come from the uploaded documents and are informational only.
+
+Public abuse protection applies to `/ask` and `/agent`: a per-IP rate limit, a maximum question length, and a global daily token cap. When the cap is hit, the response is a friendly "demo limit reached" message. The corpus is public-domain only.
 
 ## Admin
 
 `/admin` and `/admin/api/*` require one admin password. The password hash is argon2id or bcrypt. It lives in Key Vault or a Container Apps secret, never in git. Login sets a signed session cookie: HttpOnly, Secure, SameSite, with an expiry. Localhost may omit Secure so Compose works over HTTP. Failed logins are rate-limited and lock out after repeated failures. Admin forms use CSRF protection. `/ask` and `/agent` stay anonymous.
 
-The page lists each indexed document: title, source, tax year, pages, chunk count, ingested date, and status. An admin can upload a PDF (size limit and PDF type check) or add one by URL. Ingestion runs in the API process and reports queued, processing, ready, or failed. The page shows index size against the 50 MB Free-tier limit and refuses an upload that would exceed it.
+The page lists each indexed document: title, source, year when the document has one, pages, chunk count, ingested date, and status. An admin can upload a PDF (size limit and PDF type check) or add one by URL. Ingestion runs in the API process and reports queued, processing, ready, or failed. The page shows index size against the 50 MB Free-tier limit and refuses an upload that would exceed it.
 
 Delete removes the source file and every chunk for that document. Replace indexes the new version first and removes the old chunks only after that succeeds. Every admin action writes an audit record of who, what, and when. The record does not include the password or the document body.
 
@@ -101,15 +104,17 @@ Package: `agent-framework-core` (Azure OpenAI support is included). Import: `age
 | --- | --- |
 | `search_documents(query, filters)` | Wraps the same retriever as `/ask` |
 | `get_section(doc, section_id)` | Returns the full text of a cited section |
-| `compare_publications(topic)` | Pulls what several publications say about one topic, for example home office rules in Pub 587 and Pub 334 |
+| `compare_documents(topic)` | Pulls what several uploaded documents say about one topic, for example home office rules in IRS Pub 587 and Pub 334 |
 
-Guardrails: a maximum number of tool calls per request, a timeout, and a refusal for out-of-scope or unsafe requests.
+Guardrails: a maximum number of tool calls per request, a timeout, and a refusal for out-of-scope or unsafe requests. The same public limits as `/ask` apply: per-IP rate limit, maximum question length, and the daily token cap.
+
+Before coding this story, confirm the current tool-calling API in the [Python package docs](https://github.com/microsoft/agent-framework/blob/main/python/README.md). Do not guess function names from Semantic Kernel.
 
 A separate LangChain script, `eval/langchain_baseline.py`, answers the same golden set. The eval report compares accuracy, citation rate, latency, and tokens. LangChain is a baseline, not the production path.
 
 ## Evaluation
 
-`eval/golden.jsonl` holds 30 questions with expected facts and expected documents or pages. Some questions need more than one publication. Ten red-team prompts cover prompt injection, out-of-scope questions, system-prompt extraction, and invented citations. Expected behavior is to refuse, or to answer only from the documents.
+`eval/<set>/golden.jsonl` holds 30 questions with expected facts and expected documents or pages. CI runs the IRS set, `eval/irs/golden.jsonl`, and that set includes questions that need more than one document. Ten red-team prompts cover prompt injection, out-of-scope questions, system-prompt extraction, and invented citations. Expected behavior is to refuse, or to answer only from the documents.
 
 Metrics: answer correctness (LLM-as-judge plus key-fact match), citation accuracy, groundedness, red-team pass rate, latency, and token cost. Thresholds live in config (starting point: correctness at least 0.8, citation accuracy at least 0.9, red-team 10/10). The harness exits non-zero when a threshold fails. `make eval` runs it locally. CI runs it on pull requests and publishes a Markdown and JSON report.
 
@@ -182,7 +187,7 @@ Prices below are published list rates, not an invoice. Confirm them on the [Azur
 | Item | Expectation |
 | --- | --- |
 | Azure AI Search Free | $0. One service per subscription, 50 MB, 3 indexes |
-| Embedding the corpus | The IRS set, trimmed to the 50 MB index, is a small embedding job, on the order of cents |
+| Embedding the corpus | A sample set that fits the 50 MB index is a small embedding job, on the order of cents |
 | Weekend-scale Q&A and judging on `gpt-4.1-mini` | A few dollars if calls are not looped. A Thursday build of tests and one demo should land inside $1–5 |
 | Container Apps Consumption, scale to zero | $0 while idle. A short demo fits the monthly grant of 180,000 vCPU-seconds, 360,000 GiB-seconds, and 2 million requests |
 | GitHub Container Registry | $0 for this public or small private image. Azure Container Registry Basic is about $5 per month even when idle, so it is not used |
@@ -197,7 +202,8 @@ The product target is roughly $1–5 of total spend, with the $10 alert as the c
 
 | Topic | Choice |
 | --- | --- |
-| Users | A visitor asking about public-domain IRS publications. Public Q&A is anonymous. One admin password. Answers are not tax advice |
+| Users | A visitor over whatever documents an admin uploaded. Public Q&A is anonymous. One admin password. Answers are informational only |
+| Corpus | No hard-coded set. Samples live in `sample-docs/<set>/`. `make seed SET=irs` uses the admin ingest path. CI evals use the IRS golden set |
 | Admin | Password hash in Key Vault, session cookie, CSRF, blob for source PDFs, in-process ingest jobs, audit log |
 | Agent stack | `agent-framework-core`, not Semantic Kernel |
 | Chat and judge | `gpt-4.1-mini` `2025-04-14`, Data Zone Standard (US) |
