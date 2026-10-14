@@ -219,6 +219,9 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
-# Local planning docs (not published)
-*.md
-!README.md
+# Local planning inputs (not published)
+/requirements.md
+/infrastructure.md
+
+# Compiled Bicep
+infra/main.json
