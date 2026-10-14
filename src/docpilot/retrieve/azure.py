@@ -1,9 +1,12 @@
 """Azure AI Search hybrid query. Semantic ranking is skipped when the call fails."""
 
+import logging
 from collections.abc import Mapping
 
 from docpilot.ingest.azure import SEMANTIC_CONFIG
 from docpilot.retrieve.context import Hit
+
+logger = logging.getLogger(__name__)
 
 _SELECT = ["id", "content", "document_id", "title", "source", "section", "page", "year"]
 
@@ -17,10 +20,17 @@ class AzureHybridSearch:
     def search(self, question: str, vector: list[float], top_k: int) -> list[Hit]:
         try:
             return self._query(question, vector, top_k, semantic=True)
-        except Exception:  # noqa: BLE001
+        except Exception as exc:  # noqa: BLE001
             # A missing semantic config or an exhausted free allowance must
             # still return hybrid results.
-            return self._query(question, vector, top_k, semantic=False)
+            logger.warning("semantic search failed status=%s", _status_code(exc))
+            try:
+                return self._query(question, vector, top_k, semantic=False)
+            except Exception as fallback:
+                logger.warning("hybrid search failed status=%s", _status_code(fallback))
+                if _status_code(fallback) == 404:
+                    return []
+                raise
 
     def _query(self, question: str, vector: list[float], top_k: int, *, semantic: bool) -> list[Hit]:
         from azure.search.documents.models import VectorizedQuery
@@ -50,6 +60,17 @@ class AzureHybridSearch:
         from azure.search.documents import SearchClient
 
         return SearchClient(self._endpoint, self._index_name, DefaultAzureCredential())
+
+
+def _status_code(exc: BaseException) -> int | None:
+    status = getattr(exc, "status_code", None)
+    if isinstance(status, int):
+        return status
+    response = getattr(exc, "response", None)
+    status = getattr(response, "status_code", None)
+    if isinstance(status, int):
+        return status
+    return None
 
 
 def hit_from_result(item: Mapping[str, object]) -> Hit:

@@ -1,5 +1,6 @@
 """Public question page and POST /ask."""
 
+import logging
 from pathlib import Path
 
 from fastapi import APIRouter, Request
@@ -9,6 +10,7 @@ from pydantic import BaseModel, Field
 from docpilot.ask.limits import DemoLimitReached, DemoLimits, QuestionTooLong, RateLimited
 from docpilot.ask.service import DEMO_LIMIT, Asker
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 _PAGE = Path(__file__).resolve().parent / "page.html"
 
@@ -61,8 +63,9 @@ def ask(body: AskBody, request: Request) -> JSONResponse:
         )
     try:
         result = _asker(request).ask(question)
-    except Exception:  # noqa: BLE001
+    except Exception:
         # A search or model outage must not look like an empty corpus.
+        logger.exception("ask failed")
         return JSONResponse({"error": "unavailable"}, status_code=503)
     limits.add_tokens(result.tokens)
     return JSONResponse(
