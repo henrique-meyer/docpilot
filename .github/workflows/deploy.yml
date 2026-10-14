@@ -47,13 +47,13 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      # This account uses GitHub's unique OIDC subject, so the Entra
-      # federated credential subject includes the owner and repo ids.
+      # OIDC. The ids live in GitHub Actions secrets, not in this file.
+      # AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID, AZURE_RESOURCE_GROUP.
       - uses: azure/login@v2
         with:
-          client-id: 17e5dffa-f6e7-4468-9592-d18632691dcf
-          tenant-id: 161b1a40-af03-4f82-8a3f-76578be5f1bd
-          subscription-id: e72b1124-7c1d-4e40-8f8e-4ec965064677
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Let Container Apps pull the image
         continue-on-error: true
@@ -64,16 +64,19 @@ jobs:
             /user/packages/container/docpilot/visibility \
             --input - <<< '{"visibility":"public"}'
 
-      - name: Update the container app in hmeyer-docpilot
+      - name: Update the container app
+        env:
+          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          AZURE_RESOURCE_GROUP: ${{ secrets.AZURE_RESOURCE_GROUP }}
         run: |
           az containerapp update \
-            --subscription e72b1124-7c1d-4e40-8f8e-4ec965064677 \
-            --resource-group hmeyer-docpilot \
+            --subscription "$AZURE_SUBSCRIPTION_ID" \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
             --name ca-docpilot-prod \
             --image "ghcr.io/henrique-meyer/docpilot:prod"
           az containerapp ingress update \
-            --subscription e72b1124-7c1d-4e40-8f8e-4ec965064677 \
-            --resource-group hmeyer-docpilot \
+            --subscription "$AZURE_SUBSCRIPTION_ID" \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
             --name ca-docpilot-prod \
             --target-port 8000 \
             --type external
