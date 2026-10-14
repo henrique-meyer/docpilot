@@ -2,7 +2,7 @@
 
 DocPilot is a document-agnostic assistant. A visitor asks a question in a browser or over HTTP. The service answers from whatever an admin has uploaded, or, for harder questions, calls tools through Microsoft Agent Framework. Every claim is cited. An eval harness gates pull requests. The running service is a container, local or on Azure Container Apps.
 
-The target date for the whole build is **Thursday 15 October 2026**. Work is one sequenced day, not a Friday–Sunday split. No further Azure resources are created until the owner approves. Blob Storage for source PDFs is in the design and is not provisioned by this change.
+The target date for the whole build is **Thursday 15 October 2026**. Work is one sequenced day, not a Friday–Sunday split. Source PDFs live in Blob Storage account `stdocpilotprod`, container `sources`. The resource group name is a deploy-time value, kept outside git. Local Compose uses Azurite for the same container name.
 
 [requirements.md](../requirements.md) is the source of truth. The README notes that [Microsoft Agent Framework](https://github.com/microsoft/agent-framework) is the successor to Semantic Kernel. The package is `agent-framework-core`.
 
@@ -37,7 +37,7 @@ Two question paths share one retriever:
 1. `POST /ask` runs retrieval and one grounded completion. The prompt is plain code, not a framework chain.
 2. `POST /agent` runs Microsoft Agent Framework with three tools. The response includes the tool calls so the reasoning is auditable.
 
-Ingestion is one path. Admin uploads and `make seed SET=irs` both call it. It parses PDFs, chunks them, embeds them, and upserts the index. Source files live in Blob Storage, or in Azurite when running Compose. That storage account is not created until the owner approves.
+Ingestion is one path. Admin uploads and `make seed SET=irs` both call it. It parses PDFs, chunks them, embeds them, and upserts the index. Source files live in Blob Storage account `stdocpilotprod`, container `sources`. Compose uses Azurite with that same container name. The Container App reaches the account with its managed identity. When `AZURE_STORAGE_ACCOUNT_URL` is unset, `/admin` stores files under `DOCPILOT_DATA_DIR` (default `.data`) so documents can be uploaded before Compose is running.
 
 ## Repo layout
 
@@ -60,7 +60,7 @@ Each chunk keeps the document title, section heading, and page number. A year is
 
 Embeddings use `text-embedding-3-small` at **512 dimensions**. That is shorter than the model's default and keeps the Free-tier index small.
 
-One Azure AI Search index, Free tier (50 MB, 3 indexes, $0). East US 2 had no free-tier capacity on 14 October 2026, so the service `srch-docpilot-prod` is in East US, still inside resource group `hmeyer-docpilot`. Every other resource is in East US 2. Fields:
+One Azure AI Search index, Free tier (50 MB, 3 indexes, $0). East US 2 had no free-tier capacity on 14 October 2026, so the service `srch-docpilot-prod` is in East US, still inside the same resource group. Every other resource is in East US 2. Fields:
 
 | Field | Use |
 | --- | --- |
@@ -142,11 +142,11 @@ Sign-in from GitHub to Azure uses OIDC federated credentials. No cloud keys are 
 
 ## Azure
 
-Resource group: `hmeyer-docpilot`, East US 2. Do not reuse an existing App Service plan.
+Resource group: chosen at deploy time, East US 2. The name is kept in the gitignored parameter file. Do not reuse an existing App Service plan.
 
 Infrastructure is Bicep under `infra/`. The estate is Azure-only, and `az deployment group what-if` does not need a remote state account or the cost of a Terraform backend. Names look like `srch-docpilot-prod`, `kv-docpilot-prod`, `ca-docpilot-prod`. The storage account is `stdocpilotprod` because a storage account name cannot contain hyphens. The container is `sources`.
 
-One Azure environment, `prod`, at `https://docpilot.hmeyer.dev`. Local Compose is dev. A second Azure environment and a dev subdomain wait until they are worth the extra surface. The Container App uses the Consumption plan and scales to zero replicas.
+One Azure environment, `prod`, on the custom domain supplied at deploy time. Local Compose is dev. A second Azure environment and a dev subdomain wait until they are worth the extra surface. The Container App uses the Consumption plan and scales to zero replicas.
 
 The app uses a managed identity for Azure OpenAI, Blob Storage (`Storage Blob Data Contributor`), and, if the Free tier allows the data-plane role, Azure AI Search. Anything that cannot be a role assignment goes in Key Vault, including the admin password hash. The Bicep template declares the secret slot. The hash value is set outside git. If Free-tier Search rejects a data-plane role, the query key is stored in Key Vault and the exception is an ADR. Keys never go in git.
 
@@ -160,10 +160,10 @@ Binding the domain waits until the owner confirms those records exist.
 A $10 budget alert is attached to the resource group. Teardown is:
 
 ```bash
-az group delete --name hmeyer-docpilot
+az group delete --name <resource-group>
 ```
 
-Spend was approved on 14 October 2026. Every resource is created in subscription `e72b1124-7c1d-4e40-8f8e-4ec965064677`, resource group `hmeyer-docpilot`. Existing accounts in other resource groups are not reused. Subscription quota is checked at apply time.
+Spend was approved on 14 October 2026. The subscription and resource group are deploy-time values, kept outside git. Existing accounts in other resource groups are not reused. Subscription quota is checked at apply time.
 
 ### Region check
 

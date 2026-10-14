@@ -1,9 +1,9 @@
 targetScope = 'resourceGroup'
 
-// Subscription e72b1124-7c1d-4e40-8f8e-4ec965064677
-// Resource group hmeyer-docpilot only. Do not reference resources in other groups.
+// Deploy into the resource group chosen on the command line.
+// Subscription, alert email, and custom domain live in the gitignored parameter file.
 
-@description('Region for every resource in hmeyer-docpilot except Search.')
+@description('Region for every resource except Search.')
 param location string = 'eastus2'
 
 @description('Search region. East US 2 had no free-tier capacity on 14 October 2026, so Search is placed in East US inside the same resource group.')
@@ -12,14 +12,20 @@ param searchLocation string = 'eastus'
 @description('Email that receives the $10 budget alerts.')
 param budgetContactEmail string
 
-@description('Image for the first apply. GitHub Actions replaces this with the GHCR image.')
-param containerImage string = 'mcr.microsoft.com/k8se/quickstart:latest'
+@description('Image GitHub Actions publishes. A redeploy must keep this tag so the placeholder image is not restored.')
+param containerImage string = 'ghcr.io/henrique-meyer/docpilot:prod'
 
 @description('Port the container listens on.')
-param targetPort int = 80
+param targetPort int = 8000
 
 @description('HTTP path the liveness probe requests.')
-param healthPath string = '/'
+param healthPath string = '/health'
+
+@description('Custom hostname already bound to the Container App.')
+param customDomainName string = ''
+
+@description('Managed certificate resource ID for the custom hostname. Empty leaves the binding out of this deploy.')
+param customDomainCertificateId string = ''
 
 var tags = {
   project: 'docpilot'
@@ -118,6 +124,37 @@ resource embeddingDeployment 'Microsoft.CognitiveServices/accounts/deployments@2
   }
 }
 
+resource storage 'Microsoft.Storage/storageAccounts@2023-05-01' = {
+  name: 'stdocpilotprod'
+  location: location
+  tags: tags
+  sku: {
+    name: 'Standard_LRS'
+  }
+  kind: 'StorageV2'
+  properties: {
+    accessTier: 'Hot'
+    allowBlobPublicAccess: false
+    allowSharedKeyAccess: false
+    minimumTlsVersion: 'TLS1_2'
+    supportsHttpsTrafficOnly: true
+    publicNetworkAccess: 'Enabled'
+  }
+}
+
+resource blobService 'Microsoft.Storage/storageAccounts/blobServices@2023-05-01' = {
+  parent: storage
+  name: 'default'
+}
+
+resource sources 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-05-01' = {
+  parent: blobService
+  name: 'sources'
+  properties: {
+    publicAccess: 'None'
+  }
+}
+
 resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
   name: 'kv-docpilot-prod'
   location: location
@@ -169,12 +206,20 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
     managedEnvironmentId: containerEnv.id
     configuration: {
       activeRevisionsMode: 'Single'
-      ingress: {
+      ingress: union({
         external: true
         targetPort: targetPort
         transport: 'auto'
         allowInsecure: false
-      }
+      }, empty(customDomainCertificateId) ? {} : {
+        customDomains: [
+          {
+            name: customDomainName
+            bindingType: 'SniEnabled'
+            certificateId: customDomainCertificateId
+          }
+        ]
+      })
       secrets: [
         {
           name: 'appinsights-connection-string'
@@ -195,6 +240,18 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
             {
               name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
               secretRef: 'appinsights-connection-string'
+            }
+            {
+              name: 'AZURE_STORAGE_ACCOUNT_URL'
+              value: 'https://${storage.name}.blob.core.windows.net'
+            }
+            {
+              name: 'AZURE_STORAGE_CONTAINER'
+              value: sources.name
+            }
+            {
+              name: 'DOCPILOT_COOKIE_SECURE'
+              value: 'true'
             }
           ]
           probes: [
@@ -221,6 +278,7 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
 var openAiUserRole = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd')
 var searchDataRole = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '8ebe5a00-799e-43f5-93ac-243d3dce84a7')
 var keyVaultSecretsRole = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '4633458b-17de-408a-b874-0445c86b69e6')
+var blobDataRole = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'ba92f5b4-2d11-453d-a403-e96b0029c9fe')
 
 resource openAiRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   name: guid(openai.id, containerApp.id, openAiUserRole)
@@ -247,6 +305,16 @@ resource keyVaultRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   scope: keyVault
   properties: {
     roleDefinitionId: keyVaultSecretsRole
+    principalId: containerApp.identity.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+resource blobRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(storage.id, containerApp.id, blobDataRole)
+  scope: storage
+  properties: {
+    roleDefinitionId: blobDataRole
     principalId: containerApp.identity.principalId
     principalType: 'ServicePrincipal'
   }
@@ -289,6 +357,9 @@ output customDomainVerificationId string = containerEnv.properties.customDomainC
 output openAiEndpoint string = openai.properties.endpoint
 output searchEndpoint string = 'https://${search.name}.search.windows.net'
 output keyVaultName string = keyVault.name
+output storageAccountName string = storage.name
+output storageBlobEndpoint string = 'https://${storage.name}.blob.core.windows.net'
+output storageContainerName string = sources.name
 output containerAppPrincipalId string = containerApp.identity.principalId
 output chatDeploymentName string = chatDeployment.name
 output embeddingDeploymentName string = embeddingDeployment.name

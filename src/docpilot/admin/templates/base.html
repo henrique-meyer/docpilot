@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>{% block title %}DocPilot admin{% endblock %}</title>
+  {% block extra_head %}{% endblock %}
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #1c1915;
+      --muted: #5c564c;
+      --line: #e4ddd2;
+      --paper: #f7f4ef;
+      --card: #fffdf9;
+      --accent: #0f6b4c;
+      --danger: #8f2d2d;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font: 16px/1.45 "Segoe UI", system-ui, sans-serif;
+      color: var(--ink);
+      background: var(--paper);
+    }
+    main { max-width: 1080px; margin: 0 auto; padding: 32px 20px 64px; }
+    h1 { font-size: 1.6rem; margin: 0 0 8px; }
+    h2 { font-size: 1.1rem; margin: 28px 0 12px; }
+    p { color: var(--muted); }
+    a { color: var(--accent); }
+    form, .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 16px;
+    }
+    label { display: block; font-size: 0.85rem; margin-bottom: 10px; }
+    input[type="text"], input[type="password"], input[type="url"], input[type="file"] {
+      display: block;
+      width: 100%;
+      margin-top: 4px;
+      padding: 8px 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: white;
+      font: inherit;
+    }
+    button {
+      font: inherit;
+      border: 0;
+      border-radius: 8px;
+      padding: 8px 12px;
+      background: var(--accent);
+      color: white;
+      cursor: pointer;
+    }
+    button.quiet { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+    button.danger { background: var(--danger); }
+    .row { display: flex; gap: 12px; align-items: end; flex-wrap: wrap; }
+    .row label { flex: 1; min-width: 180px; }
+    .banner { padding: 10px 12px; border-radius: 8px; margin: 12px 0; }
+    .banner.error { background: #fde8e8; color: var(--danger); }
+    .banner.notice { background: #e7f6ee; color: var(--accent); }
+    table { width: 100%; border-collapse: collapse; background: var(--card); }
+    th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    th { font-size: 0.78rem; letter-spacing: 0.03em; text-transform: uppercase; color: var(--muted); }
+    .status { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 0.85rem; }
+    .status-ready { background: #e7f6ee; }
+    .status-failed { background: #fde8e8; }
+    .status-queued, .status-processing { background: #fff4d6; }
+    .meter { height: 10px; background: #efeae3; border-radius: 999px; overflow: hidden; }
+    .meter span { display: block; height: 100%; background: var(--accent); }
+    .actions form { padding: 0; border: 0; background: transparent; margin-bottom: 8px; }
+    .top { display: flex; justify-content: space-between; gap: 16px; align-items: start; }
+    .top form { padding: 0; border: 0; background: transparent; }
+  </style>
+</head>
+<body>
+  <main>
+    {% block body %}{% endblock %}
+  </main>
+</body>
+</html>

@@ -225,3 +225,9 @@ __marimo__/
 
 # Compiled Bicep
 infra/main.json
+
+# Local Azure parameters: subscription, domain, alert email. Not published.
+infra/main.bicepparam
+
+# Local admin uploads when Azure Blob is not configured
+.data/

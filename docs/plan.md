@@ -2,7 +2,7 @@
 
 The whole build is due **Thursday 15 October 2026**. The eighteen stories below are one Thursday sequence in dependency order, not a Friday–Sunday split. Architecture is in [architecture.md](architecture.md).
 
-No further Azure resource is created by this plan update. Blob Storage for source PDFs waits for a separate yes. The resources already in `hmeyer-docpilot` stay as they are.
+No further Azure resource is created by this plan update. Blob Storage for source PDFs waits for a separate yes. The resources already deployed stay as they are.
 
 ## Definition of done
 
@@ -101,7 +101,7 @@ Blocked by DOCPILOT-3. Live upload is also blocked by DOCPILOT-5.
 
 Due Thursday 15 October 2026.
 
-Bicep for Azure AI Search Free, Azure OpenAI, Key Vault, Blob Storage for source PDFs, Container Apps Consumption, a $10 budget alert, and the GitHub OIDC app, in resource group `hmeyer-docpilot`, East US 2. Key Vault has a slot for the admin password hash. The hash value is not in git or in the template. The resources already deployed stay. Blob Storage is declared in the template and is not applied until the owner approves that addition.
+Bicep for Azure AI Search Free, Azure OpenAI, Key Vault, Blob Storage for source PDFs, Container Apps Consumption, a $10 budget alert, and the GitHub OIDC app, in the DocPilot resource group, East US 2. Key Vault has a slot for the admin password hash. The hash value is not in git or in the template. The resources already deployed stay. Blob Storage is account `stdocpilotprod`, container `sources`, with Storage Blob Data Contributor on the Container App identity.
 
 Blocks the live index use inside DOCPILOT-4, and blocks DOCPILOT-13.
 
@@ -173,7 +173,7 @@ Blocked by DOCPILOT-5 and DOCPILOT-9. Blocks DOCPILOT-14.
 
 Due Thursday 15 October 2026.
 
-Print the CNAME `docpilot` and the TXT `asuid.docpilot`. Bind the managed certificate only after the owner confirms DNS. Production URL: `https://docpilot.hmeyer.dev`.
+Print the CNAME and TXT records for the custom domain. Bind the managed certificate only after the owner confirms DNS. The production hostname is a deploy-time value, kept outside git.
 
 Blocked by DOCPILOT-13. Blocks DOCPILOT-15.
 
@@ -181,7 +181,7 @@ Blocked by DOCPILOT-13. Blocks DOCPILOT-15.
 
 Due Thursday 15 October 2026.
 
-README with a diagram, local and Azure quickstart, eval table, design tradeoffs, cost, teardown (`az group delete --name hmeyer-docpilot`), the admin page, and a note that Cursor was used. `docs/walkthrough.md` is a 5–7 minute script. Short ADRs for Container Apps, plain-code retrieval, and Agent Framework plus the LangChain comparison. One historical pull request fails eval on purpose and is then fixed.
+README with a diagram, local and Azure quickstart, eval table, design tradeoffs, cost, teardown (`az group delete --name <resource-group>`), the admin page, and a note that Cursor was used. `docs/walkthrough.md` is a 5–7 minute script. Short ADRs for Container Apps, plain-code retrieval, and Agent Framework plus the LangChain comparison. One historical pull request fails eval on purpose and is then fixed.
 
 Blocked by DOCPILOT-10, DOCPILOT-11, DOCPILOT-12, DOCPILOT-14, and DOCPILOT-18.
 
