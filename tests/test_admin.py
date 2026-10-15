@@ -307,6 +307,72 @@ def test_admin_messages_stay_out_of_the_address_bar(tmp_path: Path) -> None:
     assert "docpilot_flash" not in queued.headers.get("set-cookie", "")
 
 
+def test_password_change_rejects_a_short_password_and_a_mismatch(tmp_path: Path) -> None:
+    client = _app(tmp_path)
+    csrf = _sign_in(client)
+    page = client.get("/admin/password")
+    assert page.status_code == 200
+    assert 'href="/admin/password"' in client.get("/admin").text
+    short = client.post(
+        "/admin/password",
+        data={"csrf": csrf, "password": "short", "confirm": "short"},
+    )
+    assert short.status_code == 400
+    assert "at least 8 characters" in short.text
+    mismatch = client.post(
+        "/admin/password",
+        data={"csrf": _csrf(short.text), "password": "new-password", "confirm": "other-password"},
+    )
+    assert mismatch.status_code == 400
+    assert "do not match" in mismatch.text
+    outsider = TestClient(client.app)
+    still = outsider.post(
+        "/admin/login",
+        data={"password": PASSWORD, "csrf": _csrf(outsider.get("/admin/login").text)},
+        follow_redirects=False,
+    )
+    assert still.status_code == 303
+
+
+def test_password_change_keeps_the_session_and_replaces_the_hash(tmp_path: Path) -> None:
+    client = _app(tmp_path)
+    csrf = _sign_in(client)
+    changed = client.post(
+        "/admin/password",
+        data={"csrf": csrf, "password": "new-password", "confirm": "new-password"},
+        follow_redirects=False,
+    )
+    assert changed.status_code == 303
+    assert changed.headers["location"] == "/admin"
+    landed = client.get("/admin")
+    assert landed.status_code == 200
+    assert "Password updated." in landed.text
+    stored = (tmp_path / "admin-login.json").read_text(encoding="utf-8")
+    assert "new-password" not in stored
+    assert "test-session-secret" in stored
+    outsider = TestClient(client.app)
+    login = outsider.get("/admin/login")
+    old = outsider.post(
+        "/admin/login",
+        data={"password": PASSWORD, "csrf": _csrf(login.text)},
+        follow_redirects=False,
+    )
+    assert old.status_code == 401
+    new = outsider.post(
+        "/admin/login",
+        data={"password": "new-password", "csrf": _csrf(old.text)},
+        follow_redirects=False,
+    )
+    assert new.status_code == 303
+
+
+def test_anonymous_password_page_goes_to_sign_in(tmp_path: Path) -> None:
+    client = _app(tmp_path)
+    page = client.get("/admin/password", follow_redirects=False)
+    assert page.status_code == 303
+    assert page.headers["location"] == "/admin/login"
+
+
 def test_upload_stops_at_the_index_limit(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
     def oversized(_data: bytes) -> PdfInfo:
         return PdfInfo(pages=1, index_bytes=40)

@@ -26,6 +26,8 @@ class LoginStore(Protocol):
 
     def create(self, password_hash: str, session_secret: str) -> bool: ...
 
+    def update(self, password_hash: str, session_secret: str) -> None: ...
+
 
 class FileLoginStore:
     def __init__(self, root: Path) -> None:
@@ -52,6 +54,10 @@ class FileLoginStore:
         with os.fdopen(handle, "wb") as file:
             file.write(body)
         return True
+
+    def update(self, password_hash: str, session_secret: str) -> None:
+        self.root.mkdir(parents=True, exist_ok=True)
+        (self.root / "admin-login.json").write_bytes(_dump(password_hash, session_secret))
 
 
 class BlobLoginStore:
@@ -90,6 +96,17 @@ class BlobLoginStore:
         except ResourceExistsError:
             return False
         return True
+
+    def update(self, password_hash: str, session_secret: str) -> None:
+        from azure.storage.blob import ContentSettings
+
+        client = self._client()
+        client.upload_blob(  # type: ignore[attr-defined]
+            _BLOB,
+            _dump(password_hash, session_secret),
+            overwrite=True,
+            content_settings=ContentSettings(content_type="application/json"),
+        )
 
     def _client(self) -> object:
         if self._container is not None:
@@ -158,6 +175,14 @@ class AdminLogin:
             )
             self._pending = ""
             return True
+
+    def change(self, password: str) -> None:
+        """Replace the hash. The session secret stays so the current session remains valid."""
+        with self._lock:
+            secret = self.settings.session_secret
+            digest = hash_password(password)
+            self._store.update(digest, secret)
+            self.settings = replace(self.settings, admin_password_hash=digest)
 
     def _adopt_stored(self) -> None:
         if self.settings.admin_configured:
