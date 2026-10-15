@@ -27,4 +27,9 @@ MESSAGES: dict[str, str] = {
     "password_short": "Use at least 8 characters.",
     "password_mismatch": "Those passwords do not match.",
     "already_set": "An admin password is already set. Sign in with it.",
+    "summary_long": "The title, summary, or a sample question is too long.",
+    "no_documents": "Upload a document before generating a summary.",
+    "unreadable": "The documents could not be read.",
+    "no_model": "The chat model is not configured.",
+    "draft_failed": "The model did not return a catalog summary.",
 }

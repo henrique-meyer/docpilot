@@ -8,12 +8,14 @@ from pypdf import PdfWriter
 from pytest import MonkeyPatch, raises
 
 from docpilot.admin.auth import hash_password
+from docpilot.ask.service import Asker
 from docpilot.config import Settings
 from docpilot.documents.errors import DocumentError
-from docpilot.documents.models import AuditEvent, DocumentRecord, PdfInfo
+from docpilot.documents.models import AuditEvent, CatalogSummary, DocumentRecord, PdfInfo
 from docpilot.documents.service import DocumentService
 from docpilot.documents.store import FileDocumentStore, MemoryDocumentStore
 from docpilot.ingest.chunk import Chunk
+from docpilot.ingest.pdftext import PageText
 from docpilot.ingest.pipeline import IngestResult
 from docpilot.main import create_app
 
@@ -48,8 +50,17 @@ def _settings(tmp_path: Path, **overrides: object) -> Settings:
     return Settings(**values)  # type: ignore[arg-type]
 
 
-def _app(tmp_path: Path, store: MemoryDocumentStore | FileDocumentStore | None = None, **overrides: object) -> TestClient:
-    application = create_app(_settings(tmp_path, **overrides), store or MemoryDocumentStore())
+def _app(
+    tmp_path: Path,
+    store: MemoryDocumentStore | FileDocumentStore | None = None,
+    asker: Asker | None = None,
+    **overrides: object,
+) -> TestClient:
+    application = create_app(
+        _settings(tmp_path, **overrides),
+        store or MemoryDocumentStore(),
+        asker,
+    )
     return TestClient(application)
 
 
@@ -167,7 +178,8 @@ def test_upload_replace_and_delete(tmp_path: Path) -> None:
     client = _app(tmp_path, store)
     csrf = _sign_in(client)
     documents = client.get("/admin")
-    assert 'name="title"' not in documents.text
+    upload_form = documents.text.split("<h2>Catalog Summary</h2>", 1)[0]
+    assert 'name="title"' not in upload_form
     assert 'name="year"' not in documents.text
     assert "Add by URL" not in documents.text
     assert 'name="url"' not in documents.text
@@ -633,6 +645,8 @@ def test_reset_catalog_clears_documents_and_the_audit(tmp_path: Path) -> None:
     assert uploaded.status_code == 303
     assert store.list_records()
     assert store.list_audit()
+    client.app.state.documents.save_summary("Kept title", "Kept summary", ("Q1", "Q2", "Q3"))
+    assert store.get_summary() is not None
     index = client.app.state.documents.ingestor.index
     index.docs["orphan"] = Chunk(
         id="orphan",
@@ -661,6 +675,7 @@ def test_reset_catalog_clears_documents_and_the_audit(tmp_path: Path) -> None:
     assert declined.headers["location"] == "/admin"
     assert store.list_records()
     assert store.list_audit()
+    assert store.get_summary() is not None
 
     page = client.get("/admin/reset")
     missing = client.post("/admin/reset", data={"csrf": _csrf(page.text)}, follow_redirects=False)
@@ -677,6 +692,7 @@ def test_reset_catalog_clears_documents_and_the_audit(tmp_path: Path) -> None:
     assert "audit log were deleted" in wiped.text
     assert store.list_records() == []
     assert store.list_audit() == []
+    assert store.get_summary() is None
     assert list((tmp_path / "pdfs").glob("*.pdf")) == []
     assert index.docs == {}
     assert (tmp_path / "admin-login.json").read_text(encoding="utf-8") == '{"password_hash":"kept"}'
@@ -710,9 +726,12 @@ def test_file_store_clear_corpus_leaves_the_admin_login(tmp_path: Path) -> None:
             detail="Guide",
         )
     )
+    store.put_summary(CatalogSummary("T", "S", ("a", "b", "c")))
     store.clear_corpus()
     assert store.list_records() == []
     assert store.list_audit() == []
+    assert store.get_summary() is None
+    assert not (tmp_path / "catalog-summary.json").exists()
     assert not (tmp_path / "pdfs" / "abc.pdf").exists()
     assert (tmp_path / "admin-login.json").read_text(encoding="utf-8") == "{}"
 
@@ -767,6 +786,7 @@ def test_catalog_is_written_only_after_the_blob_is_confirmed(tmp_path: Path) -> 
         saved = store.get_record(document_id)
         assert saved is not None
         assert saved.status == "processing"
+        assert [event.action for event in store.audit] == ["upload"]
         seen["status"] = saved.status
         return IngestResult(pages=1, chunk_count=0, index_bytes=1)
 
@@ -780,6 +800,7 @@ def test_catalog_is_written_only_after_the_blob_is_confirmed(tmp_path: Path) -> 
     finished = store.get_record(record.id)
     assert finished is not None
     assert finished.status == "ready"
+    assert [event.action for event in store.audit] == ["upload", "processed"]
 
 
 def test_failed_blob_confirmation_leaves_no_catalog_record(tmp_path: Path) -> None:
@@ -803,3 +824,248 @@ def test_failed_ingest_keeps_the_stored_pdf(tmp_path: Path) -> None:
     assert saved is not None
     assert saved.status == "failed"
     assert store.pdfs[record.id] == data
+    assert [event.action for event in store.audit] == ["upload", "failed"]
+
+
+def test_catalog_audit_and_usage_load_on_their_own(tmp_path: Path) -> None:
+    store = MemoryDocumentStore()
+    client = _app(tmp_path, store)
+    csrf = _sign_in(client)
+    uploaded = client.post(
+        "/admin/api/documents",
+        data={"csrf": csrf},
+        files={"file": ("guide.pdf", _pdf(title="2026 Visitor guide"), "application/pdf")},
+        follow_redirects=False,
+    )
+    assert uploaded.status_code == 303
+    page = client.get("/admin")
+    assert 'id="usage-panel"' in page.text
+    assert 'id="catalog-panel"' in page.text
+    assert 'id="audit-panel"' in page.text
+    assert "Loading…" in page.text
+    assert "No documents yet." not in page.text
+    assert "No admin actions yet." not in page.text
+    assert "Source files stored:" not in page.text
+    assert "2026 Visitor guide" not in page.text
+    assert "DOMParser" not in page.text
+    assert "/admin/api/usage" in page.text
+    assert "/admin/api/catalog" in page.text
+    assert "/admin/api/audit" in page.text
+    assert "2000" in page.text
+    assert "30000" in page.text
+    assert ".status-queued, #catalog-panel .status-processing" in page.text
+
+    usage = client.get("/admin/api/usage")
+    catalog = client.get("/admin/api/catalog")
+    audit = client.get("/admin/api/audit")
+    assert usage.status_code == 200
+    assert "extracted text" in usage.text
+    assert "Source files stored:" in usage.text
+    assert 'aria-label="Extracted text toward the index limit"' in usage.text
+    assert catalog.status_code == 200
+    assert "2026 Visitor guide" in catalog.text
+    assert "status-ready" in catalog.text
+    assert 'name="csrf"' in catalog.text
+    assert audit.status_code == 200
+    assert ">upload<" in audit.text
+    assert ">processed<" in audit.text
+    assert "2026 Visitor guide" in audit.text
+    assert "Replace" not in catalog.text
+    assert "<th>Year</th>" not in catalog.text
+    assert "nowrap" in catalog.text
+    assert 'aria-label="Delete"' in catalog.text
+    assert 'id="delete-confirm"' in page.text
+    assert ">Yes<" in page.text
+    assert ">No<" in page.text
+
+    record = store.list_records()[0]
+    record.status = "processing"
+    processing = client.get("/admin/api/catalog")
+    assert "status-processing" in processing.text
+    quiet = client.get("/admin/api/usage")
+    assert "Source files stored:" in quiet.text
+
+    outsider = TestClient(client.app)
+    assert outsider.get("/admin/api/usage").status_code == 401
+    assert outsider.get("/admin/api/catalog").status_code == 401
+    assert outsider.get("/admin/api/audit").status_code == 401
+
+
+class _DraftChat:
+    def __init__(self, text: str) -> None:
+        self.text = text
+        self.prompts: list[str] = []
+
+    def complete(self, prompt: str) -> tuple[str, int]:
+        self.prompts.append(prompt)
+        return self.text, 9
+
+
+def _ready_document(store: MemoryDocumentStore) -> None:
+    store.put_record(
+        DocumentRecord(
+            id="doc1",
+            title="2025 Publication 17",
+            source="p17.pdf",
+            year="2025",
+            pages=1,
+            chunk_count=1,
+            index_bytes=20,
+            source_bytes=20,
+            ingested_at="2026-10-15T00:00:00+00:00",
+            status="ready",
+        )
+    )
+    store.put_pdf("doc1", _pdf(title="2025 Publication 17"))
+
+
+def test_catalog_summary_saves_without_leaving_the_page(tmp_path: Path) -> None:
+    client = _app(tmp_path)
+    csrf = _sign_in(client)
+    page = client.get("/admin")
+    assert "<h2>Catalog Summary</h2>" in page.text
+    assert page.text.index("catalog-summary-form") > page.text.index('id="catalog-panel"')
+    assert 'id="catalog-summary-draft"' in page.text
+    assert "Auto-complete with AI" in page.text
+    assert "Sample questions" in page.text
+    assert 'name="question_1"' in page.text
+    assert 'name="question_2"' in page.text
+    assert 'name="question_3"' in page.text
+    assert 'id="catalog-summary-save" disabled' in page.text
+    assert "/admin/api/catalog-summary/draft" in page.text
+    assert "refreshSummarySave" in page.text
+    catalog = client.get("/admin/api/catalog")
+    assert "catalog-summary-form" not in catalog.text
+
+    saved = client.post(
+        "/admin/api/catalog-summary",
+        data={
+            "csrf": csrf,
+            "title": "  IRS Publications for use in preparing 2025 returns  ",
+            "summary": "These documents provide guidance for filing 2025 personal tax returns.",
+            "question_1": "Do dead people have to file taxes?",
+            "question_2": "Is car loan interest taxed?",
+            "question_3": "What if my wife doesn't live in the US?",
+        },
+        headers={"Accept": "application/json"},
+        follow_redirects=False,
+    )
+    assert saved.status_code == 200
+    body = saved.json()
+    assert body["message"] == "Catalog summary saved."
+    assert body["title"] == "IRS Publications for use in preparing 2025 returns"
+    assert "next" not in body
+    assert "location" not in saved.headers
+    again = client.get("/admin")
+    assert "IRS Publications for use in preparing 2025 returns" in again.text
+    assert "Do dead people have to file taxes?" in again.text
+    assert 'id="catalog-summary-save" disabled' in again.text
+    audit = client.get("/admin/api/audit")
+    assert ">catalog_summary<" in audit.text
+    assert "Catalog summary saved" in audit.text
+    assert "These documents provide guidance" not in audit.text
+
+    outsider = TestClient(client.app)
+    denied = outsider.post(
+        "/admin/api/catalog-summary",
+        data={"title": "Nope"},
+        headers={"Accept": "application/json"},
+    )
+    assert denied.status_code == 401
+    forged = client.post(
+        "/admin/api/catalog-summary",
+        data={"csrf": "nope", "title": "Nope"},
+        headers={"Accept": "application/json"},
+    )
+    assert forged.status_code == 403
+    too_long = client.post(
+        "/admin/api/catalog-summary",
+        data={"csrf": csrf, "title": "x" * 201, "summary": "", "question_1": "", "question_2": "", "question_3": ""},
+        headers={"Accept": "application/json"},
+    )
+    assert too_long.status_code == 400
+    assert too_long.json()["error"] == "summary_long"
+    kept = client.app.state.documents.get_summary()
+    assert kept.title == "IRS Publications for use in preparing 2025 returns"
+
+
+def test_catalog_summary_draft_fills_the_form_and_does_not_save(
+    tmp_path: Path, monkeypatch: MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        "docpilot.documents.summary.read_pages",
+        lambda data: [PageText(1, "", "Deceased taxpayers may still need to file a return.")],
+    )
+    store = MemoryDocumentStore()
+    _ready_document(store)
+    chat = _DraftChat(
+        '{"title":"IRS Publications for use in preparing 2025 returns",'
+        '"summary":"These documents provide guidance for filing 2025 personal tax returns.",'
+        '"questions":["Do dead people have to file taxes?","Is car loan interest taxed?",'
+        '"What if my wife does not live in the US?"]}'
+    )
+    client = _app(tmp_path, store, Asker(None, chat))
+    csrf = _sign_in(client)
+    drafted = client.post(
+        "/admin/api/catalog-summary/draft",
+        data={"csrf": csrf},
+        headers={"Accept": "application/json"},
+    )
+    assert drafted.status_code == 200
+    body = drafted.json()
+    assert body["title"] == "IRS Publications for use in preparing 2025 returns"
+    assert body["questions"][0] == "Do dead people have to file taxes?"
+    assert "message" not in body
+    assert store.get_summary() is None
+    assert chat.prompts
+    assert "Deceased taxpayers may still need to file a return." in chat.prompts[0]
+    assert "2025 Publication 17" in chat.prompts[0]
+    assert not any(event.action == "catalog_summary" for event in store.list_audit())
+
+    outsider = TestClient(client.app)
+    assert outsider.post(
+        "/admin/api/catalog-summary/draft",
+        headers={"Accept": "application/json"},
+    ).status_code == 401
+
+
+def test_catalog_summary_draft_refuses_an_empty_catalog(tmp_path: Path) -> None:
+    chat = _DraftChat("{}")
+    client = _app(tmp_path, asker=Asker(None, chat))
+    csrf = _sign_in(client)
+    drafted = client.post(
+        "/admin/api/catalog-summary/draft",
+        data={"csrf": csrf},
+        headers={"Accept": "application/json"},
+    )
+    assert drafted.status_code == 400
+    assert drafted.json()["error"] == "no_documents"
+    assert chat.prompts == []
+
+
+def test_catalog_summary_draft_needs_the_chat_model(tmp_path: Path) -> None:
+    client = _app(tmp_path)
+    csrf = _sign_in(client)
+    drafted = client.post(
+        "/admin/api/catalog-summary/draft",
+        data={"csrf": csrf},
+        headers={"Accept": "application/json"},
+    )
+    assert drafted.status_code == 503
+    assert drafted.json()["message"] == "The chat model is not configured."
+
+
+def test_catalog_summary_is_stored_beside_the_catalog(tmp_path: Path) -> None:
+    store = FileDocumentStore(tmp_path)
+    service = DocumentService(store, _settings(tmp_path))
+    service.save_summary("Shared title", "Shared summary", ("One?", "Two?", "Three?"))
+    assert (tmp_path / "catalog-summary.json").is_file()
+    assert list((tmp_path / "catalog").glob("*.json")) == []
+    restored = FileDocumentStore(tmp_path)
+    found = restored.get_summary()
+    assert found is not None
+    assert found.summary == "Shared summary"
+    assert found.questions == ("One?", "Two?", "Three?")
+    assert restored.list_audit()[0].detail == "Catalog summary saved"
+    restored.clear_corpus()
+    assert restored.get_summary() is None

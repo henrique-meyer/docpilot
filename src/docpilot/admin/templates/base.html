@@ -147,7 +147,35 @@
       0% { transform: translateX(-130%); }
       100% { transform: translateX(280%); }
     }
-    .actions form { padding: 0; border: 0; background: transparent; margin-bottom: 8px; }
+    .actions form { padding: 0; border: 0; background: transparent; margin: 0; }
+    #catalog-panel { overflow-x: auto; }
+    #catalog-panel table { width: auto; }
+    #catalog-panel .nowrap { white-space: nowrap; }
+    button.icon {
+      background: transparent;
+      color: var(--danger);
+      padding: 4px;
+      line-height: 0;
+    }
+    button.icon:hover { background: #fde8e8; }
+    .confirm { display: flex; gap: 8px; align-items: center; margin: 12px 0; }
+    .confirm[hidden] { display: none; }
+    .confirm p { margin: 0; }
+    textarea {
+      display: block;
+      width: 100%;
+      margin-top: 4px;
+      min-height: 7rem;
+      padding: 8px 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: white;
+      font: inherit;
+    }
+    button:disabled { opacity: 0.45; cursor: default; }
+    fieldset { border: 0; margin: 0 0 8px; padding: 0; }
+    legend { font-size: 0.85rem; margin-bottom: 8px; }
+    #catalog-summary-draft { margin-bottom: 12px; }
     .top { display: flex; justify-content: space-between; gap: 16px; align-items: start; }
     .top form { padding: 0; border: 0; background: transparent; }
   </style>
@@ -181,6 +209,9 @@
       var CONNECTION_ERROR = "The connection closed before the server answered.";
       var bannerTimer = 0;
       var pollTimer = 0;
+      var loadGeneration = 0;
+      var FAST_MS = 2000;
+      var IDLE_MS = 30000;
 
       function pageBanner() {
         return document.getElementById("page-banner");
@@ -325,30 +356,46 @@
         progress.setAttribute("aria-valuenow", String(percent));
       }
 
-      function refreshDocuments() {
-        if (!document.getElementById("catalog-panel")) return Promise.resolve();
-        return fetch("/admin", {
+      function loadPanel(id, url, generation) {
+        var panel = document.getElementById(id);
+        if (!panel) return Promise.resolve();
+        return fetch(url, {
           headers: { "Accept": "text/html" },
           credentials: "same-origin"
         }).then(function (response) {
+          if (!response.ok) throw new Error("panel");
           return response.text();
         }).then(function (html) {
-          var parsed = new DOMParser().parseFromString(html, "text/html");
-          ["usage-panel", "catalog-panel", "audit-panel"].forEach(function (id) {
-            var next = parsed.getElementById(id);
-            var current = document.getElementById(id);
-            if (next && current) current.replaceWith(next);
-          });
-          schedulePoll();
+          if (generation !== loadGeneration) return;
+          var current = document.getElementById(id);
+          if (!current) return;
+          current.innerHTML = html;
+          current.removeAttribute("aria-busy");
         }).catch(function () {
-          schedulePoll();
+          if (generation !== loadGeneration) return;
+          var current = document.getElementById(id);
+          if (!current || current.getAttribute("aria-busy") !== "true") return;
+          current.innerHTML = "<p>Could not load this section.</p>";
+          current.removeAttribute("aria-busy");
+        });
+      }
+
+      function loadPanels() {
+        if (!document.getElementById("catalog-panel")) return Promise.resolve();
+        var generation = ++loadGeneration;
+        return Promise.all([
+          loadPanel("usage-panel", "/admin/api/usage", generation),
+          loadPanel("catalog-panel", "/admin/api/catalog", generation),
+          loadPanel("audit-panel", "/admin/api/audit", generation)
+        ]).then(function () {
+          if (generation === loadGeneration) schedulePoll();
         });
       }
 
       function schedulePoll() {
         window.clearTimeout(pollTimer);
-        if (!document.querySelector("#catalog-panel .status-queued, #catalog-panel .status-processing")) return;
-        pollTimer = window.setTimeout(refreshDocuments, 2000);
+        var busy = document.querySelector("#catalog-panel .status-queued, #catalog-panel .status-processing");
+        pollTimer = window.setTimeout(loadPanels, busy ? FAST_MS : IDLE_MS);
       }
 
       function handleResponse(form, status, payload) {
@@ -369,8 +416,12 @@
           return;
         }
         if (form.id === "upload-form") resetUpload(form);
+        if (form.id === "catalog-summary-form") {
+          applySummary(form, payload);
+          rememberSummary();
+        }
         if (message) showBanner("notice", message);
-        if (document.getElementById("catalog-panel")) refreshDocuments();
+        if (document.getElementById("catalog-panel")) loadPanels();
       }
 
       function sendForm(form, submitter) {
@@ -424,18 +475,158 @@
         xhr.send(body);
       }
 
+      var pendingDelete = null;
+
+      function askDelete(form) {
+        var csrf = form.querySelector('input[name="csrf"]');
+        var row = form.closest("tr");
+        var title = "this document";
+        if (row && row.cells[0]) {
+          title = (row.cells[0].innerText || "").split("\n")[0].trim() || title;
+        }
+        pendingDelete = {
+          action: form.action,
+          csrf: csrf ? csrf.value : ""
+        };
+        var question = document.getElementById("delete-question");
+        var box = document.getElementById("delete-confirm");
+        if (question) question.textContent = "Delete " + title + "?";
+        if (box) box.hidden = false;
+        var yes = document.getElementById("delete-yes");
+        if (yes) yes.focus();
+      }
+
+      function closeDelete() {
+        pendingDelete = null;
+        var box = document.getElementById("delete-confirm");
+        if (box) box.hidden = true;
+      }
+
+      function confirmDelete() {
+        var pending = pendingDelete;
+        closeDelete();
+        if (!pending) return;
+        var body = new FormData();
+        body.append("csrf", pending.csrf);
+        fetch(pending.action, {
+          method: "POST",
+          body: body,
+          headers: { "Accept": "application/json" },
+          credentials: "same-origin"
+        }).then(function (response) {
+          return response.text().then(function (text) {
+            handleResponse(document.createElement("form"), response.status, parseJson(text));
+          });
+        }).catch(function () {
+          showBanner("error", CONNECTION_ERROR);
+        });
+      }
+
       document.addEventListener("submit", function (event) {
         var form = event.target;
         if (!form || form.tagName !== "FORM") return;
         event.preventDefault();
         if (form.dataset.sending === "1") return;
+        if (form.id === "catalog-summary-form") {
+          var save = document.getElementById("catalog-summary-save");
+          if (save && save.disabled) return;
+        }
+        if (form.action.indexOf("/delete") !== -1) {
+          askDelete(form);
+          return;
+        }
         form.dataset.sending = "1";
         if (form.id === "upload-form") sendUpload(form);
         else sendForm(form, event.submitter || null);
       });
 
+      var deleteYes = document.getElementById("delete-yes");
+      var deleteNo = document.getElementById("delete-no");
+      if (deleteYes) deleteYes.addEventListener("click", confirmDelete);
+      if (deleteNo) deleteNo.addEventListener("click", closeDelete);
+
+      var SUMMARY_FIELDS = ["title", "summary", "question_1", "question_2", "question_3"];
+      var summarySaved = "";
+
+      function summaryForm() {
+        return document.getElementById("catalog-summary-form");
+      }
+
+      function summaryValues(form) {
+        return SUMMARY_FIELDS.map(function (name) {
+          var field = form.elements[name];
+          return field ? field.value : "";
+        }).join("\u0000");
+      }
+
+      function rememberSummary() {
+        var form = summaryForm();
+        if (!form) return;
+        summarySaved = summaryValues(form);
+        var save = document.getElementById("catalog-summary-save");
+        if (save) save.disabled = true;
+      }
+
+      function refreshSummarySave() {
+        var form = summaryForm();
+        var save = document.getElementById("catalog-summary-save");
+        if (!form || !save) return;
+        save.disabled = summaryValues(form) === summarySaved;
+      }
+
+      function applySummary(form, payload) {
+        if (!form || !payload || !payload.questions) return;
+        if (form.elements.title) form.elements.title.value = payload.title || "";
+        if (form.elements.summary) form.elements.summary.value = payload.summary || "";
+        var questions = payload.questions;
+        if (form.elements.question_1) form.elements.question_1.value = questions[0] || "";
+        if (form.elements.question_2) form.elements.question_2.value = questions[1] || "";
+        if (form.elements.question_3) form.elements.question_3.value = questions[2] || "";
+      }
+
+      function fillSummary() {
+        var form = summaryForm();
+        var draft = document.getElementById("catalog-summary-draft");
+        if (!form || !draft || draft.disabled) return;
+        var label = draft.textContent;
+        draft.disabled = true;
+        draft.textContent = "Working…";
+        var csrf = form.querySelector('input[name="csrf"]');
+        var body = new FormData();
+        body.append("csrf", csrf ? csrf.value : "");
+        fetch("/admin/api/catalog-summary/draft", {
+          method: "POST",
+          body: body,
+          headers: { "Accept": "application/json" },
+          credentials: "same-origin"
+        }).then(function (response) {
+          return response.text().then(function (text) {
+            var payload = parseJson(text);
+            if (response.status < 200 || response.status >= 300) {
+              showBanner("error", payload.message || "The request failed.");
+              return;
+            }
+            applySummary(form, payload);
+            refreshSummarySave();
+          });
+        }).catch(function () {
+          showBanner("error", CONNECTION_ERROR);
+        }).then(function () {
+          draft.disabled = false;
+          draft.textContent = label;
+        });
+      }
+
+      var summary = summaryForm();
+      if (summary) {
+        rememberSummary();
+        summary.addEventListener("input", refreshSummarySave);
+        var draftButton = document.getElementById("catalog-summary-draft");
+        if (draftButton) draftButton.addEventListener("click", fillSummary);
+      }
+
       restoreBanner();
-      schedulePoll();
+      loadPanels();
     })();
   </script>
 </body>

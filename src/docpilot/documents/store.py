@@ -11,7 +11,14 @@ from typing import Protocol
 
 from docpilot.config import Settings
 from docpilot.documents.errors import DocumentError
-from docpilot.documents.models import AuditEvent, DocumentRecord, audit_from_json, record_from_json
+from docpilot.documents.models import (
+    AuditEvent,
+    CatalogSummary,
+    DocumentRecord,
+    audit_from_json,
+    record_from_json,
+    summary_from_json,
+)
 
 
 class DocumentStore(Protocol):
@@ -33,6 +40,12 @@ class DocumentStore(Protocol):
 
     def list_audit(self) -> list[AuditEvent]: ...
 
+    def get_summary(self) -> CatalogSummary | None: ...
+
+    def put_summary(self, summary: CatalogSummary) -> None: ...
+
+    def get_pdf(self, document_id: str) -> bytes | None: ...
+
     def clear_corpus(self) -> None: ...
 
 
@@ -41,6 +54,7 @@ class MemoryDocumentStore:
         self.pdfs: dict[str, bytes] = {}
         self.records: dict[str, DocumentRecord] = {}
         self.audit: list[AuditEvent] = []
+        self.summary: CatalogSummary | None = None
 
     def put_pdf(self, document_id: str, data: bytes) -> None:
         self.pdfs[document_id] = data
@@ -70,10 +84,20 @@ class MemoryDocumentStore:
     def list_audit(self) -> list[AuditEvent]:
         return list(self.audit)
 
+    def get_summary(self) -> CatalogSummary | None:
+        return self.summary
+
+    def put_summary(self, summary: CatalogSummary) -> None:
+        self.summary = summary
+
+    def get_pdf(self, document_id: str) -> bytes | None:
+        return self.pdfs.get(document_id)
+
     def clear_corpus(self) -> None:
         self.pdfs.clear()
         self.records.clear()
         self.audit.clear()
+        self.summary = None
 
 
 class FileDocumentStore:
@@ -118,6 +142,22 @@ class FileDocumentStore:
             events.append(audit_from_json(json.loads(path.read_text(encoding="utf-8"))))
         return events
 
+    def get_summary(self) -> CatalogSummary | None:
+        path = self.root / "catalog-summary.json"
+        if not path.is_file():
+            return None
+        return summary_from_json(json.loads(path.read_text(encoding="utf-8")))
+
+    def put_summary(self, summary: CatalogSummary) -> None:
+        self.root.mkdir(parents=True, exist_ok=True)
+        self._write_json(self.root / "catalog-summary.json", summary.to_json())
+
+    def get_pdf(self, document_id: str) -> bytes | None:
+        path = self.root / "pdfs" / f"{document_id}.pdf"
+        if not path.is_file():
+            return None
+        return path.read_bytes()
+
     def clear_corpus(self) -> None:
         for folder in ("pdfs", "catalog", "audit"):
             directory = self.root / folder
@@ -126,6 +166,7 @@ class FileDocumentStore:
             for path in directory.iterdir():
                 if path.is_file():
                     path.unlink()
+        (self.root / "catalog-summary.json").unlink(missing_ok=True)
 
     def _write_json(self, path: Path, payload: object) -> None:
         temporary = path.with_name(f"{path.name}.tmp")
@@ -210,10 +251,24 @@ class AzureBlobStore:
                 events.append(audit_from_json(json.loads(payload)))
         return events
 
+    def get_summary(self) -> CatalogSummary | None:
+        payload = self._download("catalog-summary.json")
+        if payload is None:
+            return None
+        return summary_from_json(json.loads(payload))
+
+    def put_summary(self, summary: CatalogSummary) -> None:
+        body = json.dumps(summary.to_json()).encode("utf-8")
+        self._upload("catalog-summary.json", body, "application/json")
+
+    def get_pdf(self, document_id: str) -> bytes | None:
+        return self._download(f"documents/{document_id}.pdf")
+
     def clear_corpus(self) -> None:
         for prefix in ("documents/", "catalog/", "audit/"):
             for name in self._names(prefix):
                 self._delete(name)
+        self._delete("catalog-summary.json")
 
     def _client(self) -> object:
         if self._container is not None:
