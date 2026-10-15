@@ -247,6 +247,12 @@ Found Thursday 15 October 2026.
 
 Chat and the LLM judge use one Foundry deployment, `gpt-6.1-sol` version `2026-09-29`, Data Zone Standard (US), capacity 50. Embeddings stay `text-embedding-3-small` at 512 dimensions. Public `/ask` and `/agent` keep the daily token cap as the spend throttle.
 
+### DOCPILOT-25 — Keep admin messages out of the address bar
+
+Found Thursday 15 October 2026.
+
+Admin success and error messages are not query parameters. A redirect carries the message in a short-lived HttpOnly cookie, the next page shows it once, and the address bar stays `/admin` or `/admin/login`. A refresh shows nothing. The status poll keeps the cookie only while a document is still queued or processing. JSON clients still get the JSON body.
+
 ## Issue index
 
 | Key | Summary | Due | URL |
@@ -275,3 +281,4 @@ Chat and the LLM judge use one Foundry deployment, `gpt-6.1-sol` version `2026-0
 | DOCPILOT-22 | Read title and year from the PDF | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-22 |
 | DOCPILOT-23 | Add the public header to admin | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-23 |
 | DOCPILOT-24 | Use gpt-6.1-sol for chat and the judge | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-24 |
+| DOCPILOT-25 | Keep admin messages out of the address bar | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-25 |

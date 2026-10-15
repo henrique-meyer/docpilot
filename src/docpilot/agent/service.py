@@ -111,7 +111,7 @@ class FrameworkRunner:
             model=self._deployment,
             azure_endpoint=self._endpoint,
             credential=DefaultAzureCredential(),
-            api_version="2024-10-21",
+            api_version="preview",
         )
         agent = Agent(
             client,

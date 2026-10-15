@@ -77,7 +77,6 @@ def build_llm(settings: Settings) -> object:
         azure_deployment=settings.chat_deployment,
         api_version="2024-10-21",
         azure_ad_token_provider=token,
-        temperature=0,
     )
 
 

@@ -109,16 +109,16 @@ resource chatDeployment 'Microsoft.CognitiveServices/accounts/deployments@2024-1
   dependsOn: [
     embeddingDeployment
   ]
-  name: 'gpt-4.1-mini'
+  name: 'gpt-6.1-sol'
   sku: {
     name: 'DataZoneStandard'
-    capacity: 10
+    capacity: 50
   }
   properties: {
     model: {
       format: 'OpenAI'
-      name: 'gpt-4.1-mini'
-      version: '2025-04-14'
+      name: 'gpt-6.1-sol'
+      version: '2026-09-29'
     }
   }
 }
