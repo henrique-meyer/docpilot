@@ -1,4 +1,4 @@
-# Compose runs the API and Jaeger together.
+# Compose runs the API, Azurite, and Jaeger together.
 # An image is the built filesystem. A container is a running process from that image.
 
 services:
@@ -10,8 +10,18 @@ services:
       # Jaeger accepts OTLP on this port. The UI is http://localhost:16686.
       OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
       DOCPILOT_COOKIE_SECURE: "false"
+      # Azurite's published development account. It is not a production secret.
+      AZURE_STORAGE_CONNECTION_STRING: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1;"
+      AZURE_STORAGE_CONTAINER: sources
     depends_on:
       - jaeger
+      - azurite
+
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite:3.33.0
+    command: azurite-blob --blobHost 0.0.0.0 --blobPort 10000
+    ports:
+      - "10000:10000"
 
   jaeger:
     image: jaegertracing/all-in-one:1.62.0

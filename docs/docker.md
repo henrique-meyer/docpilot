@@ -8,7 +8,7 @@ An image is a stacked filesystem plus a start command. A container is a running 
 docker compose up --build
 ```
 
-The API listens on port 8000. Jaeger collects traces and shows them at <http://localhost:16686>. Compose points the API at Jaeger's OTLP port. To use Azure OpenAI or Search from Compose, add `env_file: .env` under the `api` service. Copy `.env.example` to `.env` first. The file stays out of git.
+The API listens on port 8000. Jaeger collects traces and shows them at <http://localhost:16686>. Compose points the API at Jaeger's OTLP port. Azurite stores uploaded PDFs in the `sources` container on port 10000. The connection string is Azurite's published development account, and it wins over an account URL. To use Azure OpenAI or Search from Compose, add `env_file: .env` under the `api` service. Copy `.env.example` to `.env` first. The file stays out of git.
 
 ## Azure
 
