@@ -17,6 +17,8 @@ MESSAGES: dict[str, str] = {
     "download_failed": "The URL could not be downloaded.",
     "not_found": "That document was not found.",
     "corrupt": "The stored document record could not be read.",
+    "store_failed": "The file could not be stored.",
+    "index_failed": "The file is stored, but it could not be indexed.",
     "csrf": "The form expired. Reload the page and try again.",
     "unauthorized": "Sign in required.",
     "lockout": "Too many sign-in attempts. Try again in a few minutes.",

@@ -197,7 +197,7 @@ Blocked by DOCPILOT-7. The live password secret is also blocked by DOCPILOT-5. B
 
 Due Thursday 15 October 2026.
 
-List indexed documents: title, source, year when present, pages, chunk count, ingested date, status. Upload a PDF with a size limit and a PDF type check, or add a document by URL. Ingestion runs in the API process as a background job with status queued, processing, ready, or failed, on the same path as `make seed`. The page shows index size against the 50 MB Free-tier limit and blocks an upload that would exceed it.
+List indexed documents: title, source, year when present, pages, chunk count, ingested date, status. Upload a PDF with a size limit and a PDF type check, or add a document by URL. The PDF is confirmed in blob storage before the catalog record is written. Ingestion then runs in the API process as a background job with status queued, processing, ready, or failed, on the same path as `make seed`. The page shows index size against the 50 MB Free-tier limit and blocks an upload that would exceed it. [DOCPILOT-19](https://nitro.atlassian.net/browse/DOCPILOT-19) is the bug where the catalog was written before that confirmation.
 
 Blocked by DOCPILOT-16 and DOCPILOT-4. Blocks DOCPILOT-18.
 
@@ -205,9 +205,17 @@ Blocked by DOCPILOT-16 and DOCPILOT-4. Blocks DOCPILOT-18.
 
 Due Thursday 15 October 2026.
 
-Delete removes the source file and every chunk for that document. Replace re-ingests the new version and removes the old chunks only after the new ones are indexed. Source PDFs live in Azure Blob Storage. Compose uses Azurite. Every admin action is an audit record: who, what, when, with no password and no document body. Tests cover delete and replace.
+Delete removes the source file and every chunk for that document. Replace stores and confirms the new PDF, then re-ingests it and removes the old chunks only after the new ones are indexed. Source PDFs live in Azure Blob Storage. Compose uses Azurite. Every admin action is an audit record: who, what, when, with no password and no document body. Tests cover delete and replace. [DOCPILOT-19](https://nitro.atlassian.net/browse/DOCPILOT-19) requires the blob write to be confirmed before the catalog record is created.
 
 Blocked by DOCPILOT-17. Live blob is also blocked by DOCPILOT-5. Blocks DOCPILOT-15.
+
+### DOCPILOT-19 — Store the PDF before cataloging it
+
+Found Thursday 15 October 2026.
+
+Bug. Admin upload wrote a catalog record before the PDF was stored. Indexing, including embeddings, ran while `sources/documents/{id}.pdf` did not exist. A slow or failed ingest left a catalog entry and no file.
+
+Store the PDF and confirm the object size. Write the catalog record only after that confirmation. A failed upload or failed confirmation leaves no catalog record. Extraction, chunking, embeddings, and index upsert run after the file is confirmed. A later ingest failure keeps the stored PDF and the catalog entry, and marks the entry failed.
 
 ## Issue index
 
@@ -231,3 +239,4 @@ Blocked by DOCPILOT-17. Live blob is also blocked by DOCPILOT-5. Blocks DOCPILOT
 | DOCPILOT-16 | Admin login | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-16 |
 | DOCPILOT-17 | Admin catalog, upload, and capacity | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-17 |
 | DOCPILOT-18 | Delete, replace, blob storage, and audit | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-18 |
+| DOCPILOT-19 | Store the PDF before cataloging it | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-19 |

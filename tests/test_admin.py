@@ -5,12 +5,15 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 from pypdf import PdfWriter
-from pytest import MonkeyPatch
+from pytest import MonkeyPatch, raises
 
 from docpilot.admin.auth import hash_password
 from docpilot.config import Settings
-from docpilot.documents.models import PdfInfo
+from docpilot.documents.errors import DocumentError
+from docpilot.documents.models import DocumentRecord, PdfInfo
+from docpilot.documents.service import DocumentService
 from docpilot.documents.store import FileDocumentStore, MemoryDocumentStore
+from docpilot.ingest.pipeline import IngestResult
 from docpilot.main import create_app
 
 PASSWORD = "correct-horse"
@@ -193,7 +196,8 @@ def test_upload_stops_at_the_index_limit(tmp_path: Path, monkeypatch: MonkeyPatc
         return PdfInfo(pages=1, index_bytes=40)
 
     monkeypatch.setattr("docpilot.documents.service.extract_pdf", oversized)
-    client = _app(tmp_path, index_limit_bytes=50)
+    store = MemoryDocumentStore()
+    client = _app(tmp_path, store, index_limit_bytes=50)
     csrf = _sign_in(client)
     first = client.post(
         "/admin/api/documents",
@@ -213,6 +217,8 @@ def test_upload_stops_at_the_index_limit(tmp_path: Path, monkeypatch: MonkeyPatc
     statuses = {item["title"]: item["status"] for item in documents}
     assert statuses["First"] == "ready"
     assert statuses["Second"] == "failed"
+    failed = next(item for item in documents if item["title"] == "Second")
+    assert store.pdfs[failed["id"]].startswith(b"%PDF-")
 
 
 def test_private_urls_are_refused(tmp_path: Path) -> None:
@@ -320,3 +326,91 @@ def test_second_visitor_cannot_replace_the_password(tmp_path: Path) -> None:
         follow_redirects=False,
     )
     assert owner.status_code == 303
+
+
+class _RecordingStore(MemoryDocumentStore):
+    def __init__(self) -> None:
+        super().__init__()
+        self.events: list[str] = []
+
+    def put_pdf(self, document_id: str, data: bytes) -> None:
+        self.events.append("put_pdf")
+        super().put_pdf(document_id, data)
+
+    def confirm_pdf(self, document_id: str, size: int) -> bool:
+        self.events.append("confirm_pdf")
+        return super().confirm_pdf(document_id, size)
+
+    def delete_pdf(self, document_id: str) -> None:
+        self.events.append("delete_pdf")
+        super().delete_pdf(document_id)
+
+    def put_record(self, record: DocumentRecord) -> None:
+        self.events.append(f"record:{record.status}")
+        super().put_record(record)
+
+
+class _RefuseConfirm(_RecordingStore):
+    def confirm_pdf(self, document_id: str, size: int) -> bool:
+        self.events.append("confirm_pdf")
+        return False
+
+
+class _BoomIngestor:
+    def ingest(self, data: bytes, **kwargs: object) -> IngestResult:
+        del data, kwargs
+        raise DocumentError("over_capacity")
+
+    def delete(self, document_id: str) -> None:
+        del document_id
+
+
+def test_catalog_is_written_only_after_the_blob_is_confirmed(tmp_path: Path) -> None:
+    store = _RecordingStore()
+    service = DocumentService(store, _settings(tmp_path))
+    data = _pdf()
+    seen: dict[str, str] = {}
+
+    def ingest(payload: bytes, **kwargs: object) -> IngestResult:
+        store.events.append("ingest")
+        document_id = str(kwargs["document_id"])
+        assert store.pdfs[document_id] == payload
+        saved = store.get_record(document_id)
+        assert saved is not None
+        assert saved.status == "processing"
+        seen["status"] = saved.status
+        return IngestResult(pages=1, chunk_count=0, index_bytes=1)
+
+    service.ingestor.ingest = ingest  # type: ignore[method-assign]
+    record = service.begin_upload(data, title="Pub 17", source="p17.pdf", year=None)
+    assert store.events == ["put_pdf", "confirm_pdf", "record:queued"]
+    assert store.pdfs[record.id] == data
+    service.finish_upload(record.id, data)
+    assert seen["status"] == "processing"
+    assert store.events.index("ingest") > store.events.index("record:queued")
+    finished = store.get_record(record.id)
+    assert finished is not None
+    assert finished.status == "ready"
+
+
+def test_failed_blob_confirmation_leaves_no_catalog_record(tmp_path: Path) -> None:
+    store = _RefuseConfirm()
+    service = DocumentService(store, _settings(tmp_path))
+    with raises(DocumentError) as caught:
+        service.begin_upload(_pdf(), title="Pub 17", source="p17.pdf", year=None)
+    assert caught.value.code == "store_failed"
+    assert store.events == ["put_pdf", "confirm_pdf", "delete_pdf"]
+    assert store.list_records() == []
+    assert store.pdfs == {}
+
+
+def test_failed_ingest_keeps_the_stored_pdf(tmp_path: Path) -> None:
+    store = MemoryDocumentStore()
+    service = DocumentService(store, _settings(tmp_path), ingestor=_BoomIngestor())  # type: ignore[arg-type]
+    data = _pdf()
+    record = service.begin_upload(data, title="Pub 17", source="p17.pdf", year=None)
+    service.finish_upload(record.id, data)
+    saved = store.get_record(record.id)
+    assert saved is not None
+    assert saved.status == "failed"
+    assert store.pdfs[record.id] == data

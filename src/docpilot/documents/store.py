@@ -16,6 +16,8 @@ from docpilot.documents.models import AuditEvent, DocumentRecord, audit_from_jso
 class DocumentStore(Protocol):
     def put_pdf(self, document_id: str, data: bytes) -> None: ...
 
+    def confirm_pdf(self, document_id: str, size: int) -> bool: ...
+
     def delete_pdf(self, document_id: str) -> None: ...
 
     def put_record(self, record: DocumentRecord) -> None: ...
@@ -39,6 +41,10 @@ class MemoryDocumentStore:
 
     def put_pdf(self, document_id: str, data: bytes) -> None:
         self.pdfs[document_id] = data
+
+    def confirm_pdf(self, document_id: str, size: int) -> bool:
+        data = self.pdfs.get(document_id)
+        return data is not None and len(data) == size
 
     def delete_pdf(self, document_id: str) -> None:
         self.pdfs.pop(document_id, None)
@@ -69,6 +75,10 @@ class FileDocumentStore:
     def put_pdf(self, document_id: str, data: bytes) -> None:
         path = self._path("pdfs", f"{document_id}.pdf")
         path.write_bytes(data)
+
+    def confirm_pdf(self, document_id: str, size: int) -> bool:
+        path = self.root / "pdfs" / f"{document_id}.pdf"
+        return path.is_file() and path.stat().st_size == size
 
     def delete_pdf(self, document_id: str) -> None:
         self._path("pdfs", f"{document_id}.pdf").unlink(missing_ok=True)
@@ -123,6 +133,17 @@ class AzureBlobStore:
 
     def put_pdf(self, document_id: str, data: bytes) -> None:
         self._upload(f"documents/{document_id}.pdf", data, "application/pdf")
+
+    def confirm_pdf(self, document_id: str, size: int) -> bool:
+        from azure.core.exceptions import ResourceNotFoundError
+
+        client = self._client()
+        blob = client.get_blob_client(f"documents/{document_id}.pdf")  # type: ignore[attr-defined]
+        try:
+            props = blob.get_blob_properties()
+        except ResourceNotFoundError:
+            return False
+        return getattr(props, "size", None) == size
 
     def delete_pdf(self, document_id: str) -> None:
         self._delete(f"documents/{document_id}.pdf")
