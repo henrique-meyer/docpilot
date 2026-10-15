@@ -133,6 +133,16 @@ def test_daily_token_cap_returns_the_demo_message(tmp_path: Path) -> None:
     assert second.json()["answer"] == "demo limit reached"
 
 
+def test_enter_submits_the_ask_box(tmp_path: Path) -> None:
+    client = _client(tmp_path, Asker(None, None))
+    page = client.get("/")
+    assert 'addEventListener("keydown"' in page.text
+    assert 'event.key !== "Enter"' in page.text
+    assert "event.ctrlKey" in page.text
+    assert 'setRangeText("\\n"' in page.text
+    assert "form.requestSubmit()" in page.text
+
+
 def test_home_page_states_the_disclaimer(tmp_path: Path) -> None:
     client = _client(tmp_path, Asker(None, None))
     page = client.get("/")
