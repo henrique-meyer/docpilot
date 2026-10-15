@@ -79,22 +79,33 @@ resource search 'Microsoft.Search/searchServices@2023-11-01' = {
   }
 }
 
-resource openai 'Microsoft.CognitiveServices/accounts@2024-10-01' = {
-  name: 'oai-docpilot-prod'
+resource foundry 'Microsoft.CognitiveServices/accounts@2025-06-01' = {
+  name: 'ais-docpilot-prod'
   location: location
   tags: tags
-  kind: 'OpenAI'
+  kind: 'AIServices'
   sku: {
     name: 'S0'
   }
   properties: {
-    customSubDomainName: 'oai-docpilot-prod'
+    customSubDomainName: 'ais-docpilot-prod'
     publicNetworkAccess: 'Enabled'
+    allowProjectManagement: true
+  }
+}
+
+resource foundryProject 'Microsoft.CognitiveServices/accounts/projects@2025-06-01' = {
+  parent: foundry
+  name: 'docpilot-prod'
+  location: location
+  properties: {
+    displayName: 'DocPilot'
+    description: 'DocPilot production project'
   }
 }
 
 resource chatDeployment 'Microsoft.CognitiveServices/accounts/deployments@2024-10-01' = {
-  parent: openai
+  parent: foundry
   dependsOn: [
     embeddingDeployment
   ]
@@ -113,7 +124,7 @@ resource chatDeployment 'Microsoft.CognitiveServices/accounts/deployments@2024-1
 }
 
 resource embeddingDeployment 'Microsoft.CognitiveServices/accounts/deployments@2024-10-01' = {
-  parent: openai
+  parent: foundry
   name: 'text-embedding-3-small'
   sku: {
     name: 'DataZoneStandard'
@@ -255,7 +266,7 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
             }
             {
               name: 'AZURE_OPENAI_ENDPOINT'
-              value: openai.properties.endpoint
+              value: foundry.properties.endpoint
             }
             {
               name: 'AZURE_OPENAI_EMBEDDING_DEPLOYMENT'
@@ -299,17 +310,17 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
   }
 }
 
-var openAiUserRole = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd')
+var foundryUserRole = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd')
 var searchDataRole = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '8ebe5a00-799e-43f5-93ac-243d3dce84a7')
 var searchServiceRole = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '7ca78c8a-450e-4526-93fa-f21fdbf7b4d7')
 var keyVaultSecretsRole = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '4633458b-17de-408a-b874-0445c86b69e6')
 var blobDataRole = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'ba92f5b4-2d11-453d-a403-e96b0029c9fe')
 
-resource openAiRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(openai.id, containerApp.id, openAiUserRole)
-  scope: openai
+resource foundryRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(foundry.id, containerApp.id, foundryUserRole)
+  scope: foundry
   properties: {
-    roleDefinitionId: openAiUserRole
+    roleDefinitionId: foundryUserRole
     principalId: containerApp.identity.principalId
     principalType: 'ServicePrincipal'
   }
@@ -389,7 +400,7 @@ resource budget 'Microsoft.Consumption/budgets@2023-11-01' = {
 
 output containerAppFqdn string = containerApp.properties.configuration.ingress.fqdn
 output customDomainVerificationId string = containerEnv.properties.customDomainConfiguration.customDomainVerificationId
-output openAiEndpoint string = openai.properties.endpoint
+output foundryEndpoint string = foundry.properties.endpoint
 output searchEndpoint string = 'https://${search.name}.search.windows.net'
 output keyVaultName string = keyVault.name
 output storageAccountName string = storage.name
