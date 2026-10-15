@@ -1,7 +1,7 @@
 # docpilot
 AI document assistant in **Python**: Retrieval-Augmented Generation (RAG) Q&A with citations and a tool-using agent built on **Microsoft Agent Framework** (the successor to Semantic Kernel), **Azure OpenAI**, and **Azure AI Search**. It ships with an evaluation harness, Docker, and CI/CD, and deploys to **Azure Container Apps**.
 
-Live demo: *(coming soon)*
+Live demo: deployed from `main`. The hostname is configured outside this repo.
 
 ## What it does
 - Upload any set of documents (PDF) through a password-protected admin page; DocPilot chunks, embeds, and indexes them.
@@ -43,8 +43,56 @@ One resource group, in East US 2. The group name, subscription, and any custom d
 
 Container images are published to GitHub Container Registry. There is no Azure Container Registry.
 
+## Local quickstart
+
+```bash
+docker compose up --build
+```
+
+The API listens on port 8000. `/` asks a question. `/admin` is the document catalog. The first visitor sets the admin password; later visits sign in with it. Jaeger is at <http://localhost:16686>.
+
+Sample catalogs live in `sample-docs/<set>/SOURCES.md`. The PDFs stay out of git. After they are on disk, this loads one set through the same path as an admin upload:
+
+```bash
+make seed SET=irs
+```
+
+## Azure
+
+A push to `main` builds the image, pushes it to GitHub Container Registry, and updates the container app. Search stays on the Free tier. The app scales to zero. The daily trace cap is 0.1 GB.
+
+Teardown, using the resource group in the local parameter file:
+
+```bash
+az group delete --name <resource-group>
+```
+
+## Admin
+
+`/admin` lists documents and shows extracted text size against the 50 MB index limit. An admin can upload a PDF, add one by URL, replace a document, or delete it. Delete removes the source file and its chunks. Replace indexes the new file before the old chunks are removed. Every action is an audit record with no password and no document body.
+
+## Eval
+
+Pull-request CI runs the IRS set in self-check mode: 30 questions and 10 red-team prompts, scored against reference answers so the gate does not call Azure. `make eval` runs the live judge when both Azure endpoints are set. The report artifact is `eval-irs`.
+
+| Check | Threshold |
+| --- | --- |
+| Correctness | 0.80 |
+| Citation accuracy | 0.90 |
+| Groundedness | 0.80 |
+| Red team | 10/10 |
+
+## Design
+
+Retrieval is plain code: hybrid search, a token budget, and a versioned prompt. The agent is Microsoft Agent Framework. LangChain is a dev-only baseline, not the production path. The short records are [Container Apps](docs/decisions/0001-container-apps.md), [plain retrieval](docs/decisions/0002-plain-retrieval.md), and [Agent Framework](docs/decisions/0003-agent-framework.md). A spoken tour is [docs/walkthrough.md](docs/walkthrough.md).
+
+## Cost
+
+Search is Free. Chat and the judge use `gpt-4.1-mini`. Embeddings use `text-embedding-3-small` at 512 dimensions. Container Apps is Consumption, scaled to zero. The resource-group budget alert is $10.
+
 ## Status
-In active development. Architecture, setup, eval results, and a walkthrough will be added as the build progresses.
+
+The ask API, agent, eval gate, tracing, admin catalog, and deploy workflow are on `main`. Architecture is in [docs/architecture.md](docs/architecture.md).
 
 ## License
 MIT
