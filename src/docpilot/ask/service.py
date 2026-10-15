@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from docpilot.config import Settings
+from docpilot.ingest.repair import repair_passage
 from docpilot.observe import bind_trace, span
 from docpilot.retrieve.context import Hit
 from docpilot.retrieve.prompt import build_prompt
@@ -64,7 +65,7 @@ def _is_not_found(text: str) -> bool:
 
 
 def _citation(hit: Hit) -> dict[str, object]:
-    snippet = " ".join(hit.content.split())
+    snippet = " ".join(repair_passage(hit.content).split())
     if len(snippet) > SNIPPET_CHARS:
         snippet = snippet[: SNIPPET_CHARS - 1].rstrip() + "…"
     citation: dict[str, object] = {

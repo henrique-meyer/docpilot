@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from docpilot.ingest.repair import repair_passage
 from docpilot.retrieve.context import Hit
 
 PROMPT_VERSION = "answer_v1"
@@ -21,7 +22,7 @@ def render_context(hits: list[Hit]) -> str:
     for index, hit in enumerate(hits, start=1):
         year = f" | {hit.year}" if hit.year else ""
         header = f"[{index}] {hit.title} | {hit.section} | p. {hit.page}{year}"
-        blocks.append(f"{header}\n{hit.content}")
+        blocks.append(f"{header}\n{repair_passage(hit.content)}")
     return "\n\n".join(blocks)
 
 
