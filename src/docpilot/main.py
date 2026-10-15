@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from docpilot.admin.auth import LoginGuard
+from docpilot.admin.bootstrap import AdminLogin, build_login_store
 from docpilot.admin.routes import router as admin_router
 from docpilot.agent.routes import router as agent_router
 from docpilot.agent.service import Pilot, build_pilot
@@ -30,7 +31,9 @@ def create_app(
     configure_logging()
     configure_tracing(resolved)
     app = FastAPI(title="DocPilot")
-    app.state.settings = resolved
+    login = AdminLogin(build_login_store(resolved), resolved)
+    app.state.admin_login = login
+    app.state.settings = login.settings
     app.state.documents = DocumentService(
         store or build_store(resolved),
         resolved,

@@ -16,6 +16,7 @@ from docpilot.admin.auth import (
     read_session,
     write_session,
 )
+from docpilot.admin.bootstrap import MIN_PASSWORD_CHARS, AdminLogin
 from docpilot.config import Settings
 from docpilot.documents.errors import MESSAGES, DocumentError
 from docpilot.documents.fetch import download_pdf
@@ -47,8 +48,16 @@ _TEMPLATES.filters["bytes"] = format_bytes
 
 
 def _settings(request: Request) -> Settings:
+    login: AdminLogin | None = getattr(request.app.state, "admin_login", None)
+    if login is not None:
+        return login.settings
     settings: Settings = request.app.state.settings
     return settings
+
+
+def _login_state(request: Request) -> AdminLogin:
+    login: AdminLogin = request.app.state.admin_login
+    return login
 
 
 def _service(request: Request) -> DocumentService:
@@ -92,8 +101,21 @@ def _login_page(
     error: str = "",
     csrf: str = "",
     notice: str = "",
+    setup: bool = False,
 ) -> HTMLResponse:
-    return _render("login.html", status_code=status_code, error=error, csrf=csrf, notice=notice)
+    return _render(
+        "login.html",
+        status_code=status_code,
+        error=error,
+        csrf=csrf,
+        notice=notice,
+        setup=setup,
+    )
+
+
+def _attach_cookie(page: HTMLResponse, probe: Response) -> HTMLResponse:
+    page.headers["set-cookie"] = probe.headers["set-cookie"]
+    return page
 
 
 def _anonymous_denied(request: Request) -> Response:
@@ -107,7 +129,7 @@ def _require_admin(request: Request) -> Response | None:
     if not settings.admin_configured:
         if _wants_json(request) or request.url.path.startswith("/admin/api"):
             return _no_store(JSONResponse({"error": "not_configured"}, status_code=503))
-        return _login_page(status_code=503, error=MESSAGES["not_configured"])
+        return _no_store(RedirectResponse("/admin/login", status_code=303))
     if not _signed_in(request):
         if request.url.path.startswith("/admin/api"):
             return _anonymous_denied(request)
@@ -131,21 +153,67 @@ def login_form(request: Request) -> Response:
     settings = _settings(request)
     notice = NOTICES.get(request.query_params.get("notice", ""), "")
     if not settings.admin_configured:
-        return _login_page(status_code=503, error=MESSAGES["not_configured"], notice=notice)
+        return _setup_form(request, notice=notice)
     if _signed_in(request):
         return RedirectResponse("/admin", status_code=303)
     probe = Response()
     csrf = write_session(probe, settings, None)
     page = _login_page(csrf=csrf, notice=notice)
-    page.headers["set-cookie"] = probe.headers["set-cookie"]
-    return page
+    return _attach_cookie(page, probe)
+
+
+def _setup_form(request: Request, *, notice: str = "", error: str = "", status_code: int = 200) -> HTMLResponse:
+    signing = _login_state(request).prepare()
+    session = read_session(request, signing)
+    if session is None:
+        probe = Response()
+        csrf = write_session(probe, signing, None)
+        page = _login_page(status_code=status_code, error=error, csrf=csrf, notice=notice, setup=True)
+        return _attach_cookie(page, probe)
+    return _login_page(
+        status_code=status_code,
+        error=error,
+        csrf=session.csrf,
+        notice=notice,
+        setup=True,
+    )
+
+
+@router.post("/admin/setup")
+def setup_admin(
+    request: Request,
+    password: str = Form(""),
+    confirm: str = Form(""),
+    csrf: str = Form(""),
+) -> Response:
+    login = _login_state(request)
+    if login.settings.admin_configured:
+        return _no_store(RedirectResponse("/admin/login", status_code=303))
+    signing = login.prepare()
+    session = read_session(request, signing)
+    if not csrf_matches(session, csrf):
+        return _setup_form(request, error=MESSAGES["csrf"], status_code=403)
+    if len(password) < MIN_PASSWORD_CHARS:
+        return _setup_form(request, error=MESSAGES["password_short"], status_code=400)
+    if password != confirm:
+        return _setup_form(request, error=MESSAGES["password_mismatch"], status_code=400)
+    if not login.claim(password):
+        if not login.settings.admin_configured:
+            return _setup_form(request, error=MESSAGES["already_set"], status_code=409)
+        probe = Response()
+        token = write_session(probe, login.settings, None)
+        page = _login_page(error=MESSAGES["already_set"], csrf=token)
+        return _attach_cookie(page, probe)
+    response = RedirectResponse("/admin", status_code=303)
+    write_session(response, login.settings, "admin")
+    return _no_store(response)
 
 
 @router.post("/admin/login")
 def login(request: Request, password: str = Form(""), csrf: str = Form("")) -> Response:
     settings = _settings(request)
     if not settings.admin_configured:
-        return _login_page(status_code=503, error=MESSAGES["not_configured"])
+        return _setup_form(request)
     denied = _require_csrf(request, csrf)
     if denied is not None:
         return denied

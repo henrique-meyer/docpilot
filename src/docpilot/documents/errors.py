@@ -22,4 +22,7 @@ MESSAGES: dict[str, str] = {
     "lockout": "Too many sign-in attempts. Try again in a few minutes.",
     "bad_password": "The password is wrong.",
     "not_configured": "Admin login is not configured.",
+    "password_short": "Use at least 8 characters.",
+    "password_mismatch": "Those passwords do not match.",
+    "already_set": "An admin password is already set. Sign in with it.",
 }

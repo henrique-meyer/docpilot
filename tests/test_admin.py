@@ -251,8 +251,72 @@ def test_file_store_round_trip(tmp_path: Path) -> None:
     assert pdf.startswith(b"%PDF-")
 
 
-def test_unconfigured_admin_is_closed(tmp_path: Path) -> None:
+def test_unconfigured_admin_asks_the_first_visitor_to_set_it(tmp_path: Path) -> None:
     client = _app(tmp_path, admin_password_hash="", session_secret="")
-    response = client.get("/admin/login")
-    assert response.status_code == 503
-    assert "not configured" in response.text
+    page = client.get("/admin/login")
+    assert page.status_code == 200
+    assert "first person" in page.text
+    assert 'action="/admin/setup"' in page.text
+    short = client.post(
+        "/admin/setup",
+        data={"password": "short", "confirm": "short", "csrf": _csrf(page.text)},
+    )
+    assert short.status_code == 400
+    assert "at least 8" in short.text
+    mismatch = client.post(
+        "/admin/setup",
+        data={"password": "first-admin", "confirm": "other-admin", "csrf": _csrf(short.text)},
+    )
+    assert mismatch.status_code == 400
+    saved = client.post(
+        "/admin/setup",
+        data={"password": "first-admin", "confirm": "first-admin", "csrf": _csrf(mismatch.text)},
+        follow_redirects=False,
+    )
+    assert saved.status_code == 303
+    assert saved.headers["location"] == "/admin"
+    catalog = client.get("/admin")
+    assert catalog.status_code == 200
+    stored = (tmp_path / "admin-login.json").read_text(encoding="utf-8")
+    assert "first-admin" not in stored
+
+    later = TestClient(create_app(_settings(tmp_path, admin_password_hash="", session_secret=""), MemoryDocumentStore()))
+    login = later.get("/admin/login")
+    assert "first person" not in login.text
+    signed = later.post(
+        "/admin/login",
+        data={"password": "first-admin", "csrf": _csrf(login.text)},
+        follow_redirects=False,
+    )
+    assert signed.status_code == 303
+
+
+def test_second_visitor_cannot_replace_the_password(tmp_path: Path) -> None:
+    first = _app(tmp_path, admin_password_hash="", session_secret="")
+    page = first.get("/admin/login")
+    first.post(
+        "/admin/setup",
+        data={"password": "first-admin", "confirm": "first-admin", "csrf": _csrf(page.text)},
+        follow_redirects=False,
+    )
+    second = TestClient(first.app)
+    attempt = second.get("/admin/login")
+    assert "first person" not in attempt.text
+    rejected = second.post(
+        "/admin/setup",
+        data={"password": "second-admin", "confirm": "second-admin", "csrf": "missing"},
+        follow_redirects=False,
+    )
+    assert rejected.status_code == 303
+    login = second.get("/admin/login")
+    signed = second.post(
+        "/admin/login",
+        data={"password": "second-admin", "csrf": _csrf(login.text)},
+    )
+    assert signed.status_code == 401
+    owner = second.post(
+        "/admin/login",
+        data={"password": "first-admin", "csrf": _csrf(signed.text)},
+        follow_redirects=False,
+    )
+    assert owner.status_code == 303
