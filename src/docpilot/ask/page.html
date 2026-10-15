@@ -101,21 +101,32 @@
   </main>
   <script>
     const form = document.getElementById("ask");
+    const question = document.getElementById("question");
     const status = document.getElementById("status");
     const result = document.getElementById("result");
+    question.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" || event.isComposing || event.repeat) return;
+      if (event.ctrlKey) {
+        event.preventDefault();
+        question.setRangeText("\n", question.selectionStart, question.selectionEnd, "end");
+        return;
+      }
+      event.preventDefault();
+      form.requestSubmit();
+    });
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
       status.classList.remove("hidden");
       status.textContent = "Looking through the documents…";
       result.classList.add("hidden");
       result.textContent = "";
-      const question = document.getElementById("question").value;
+      const questionText = question.value;
       let body = {};
       try {
         const response = await fetch("/ask", {
           method: "POST",
           headers: { "Content-Type": "application/json", "Accept": "application/json" },
-          body: JSON.stringify({ question })
+          body: JSON.stringify({ question: questionText })
         });
         body = await response.json();
       } catch (error) {
