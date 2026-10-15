@@ -322,6 +322,7 @@ def admin_page(request: Request) -> Response:
         error=error,
         notice=notice,
         processing=processing,
+        signed_in=True,
     )
     if present and not processing:
         clear_flash(page, _settings(request))
@@ -452,6 +453,7 @@ def password_page(request: Request) -> Response:
     return _render(
         "password.html",
         csrf=session.csrf if session else "",
+        signed_in=True,
     )
 
 
@@ -476,6 +478,7 @@ def change_password(
             status_code=400,
             csrf=token,
             error=MESSAGES["password_short"],
+            signed_in=True,
         )
     if password != confirm:
         return _render(
@@ -483,6 +486,7 @@ def change_password(
             status_code=400,
             csrf=token,
             error=MESSAGES["password_mismatch"],
+            signed_in=True,
         )
     _login_state(request).change(password)
     return _redirect(request, "/admin", notice="password_changed")
@@ -497,6 +501,7 @@ def reset_page(request: Request) -> Response:
     return _render(
         "reset.html",
         csrf=session.csrf if session else "",
+        signed_in=True,
     )
 
 

@@ -39,12 +39,47 @@
       color: #F4F0E6;
     }
     header img { width: 36px; height: 36px; }
-    header a {
+    header > a {
       color: #F4F0E6;
       font-size: 1.15rem;
       font-weight: 700;
       text-decoration: none;
     }
+    .admin-menu { margin-left: auto; position: relative; }
+    .admin-menu summary {
+      cursor: pointer;
+      font-weight: 700;
+      list-style: none;
+    }
+    .admin-menu summary::-webkit-details-marker { display: none; }
+    .admin-menu div {
+      position: absolute;
+      right: 0;
+      top: calc(100% + 8px);
+      min-width: 200px;
+      background: var(--card);
+      color: var(--ink);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 6px 0;
+      z-index: 2;
+    }
+    .admin-menu a,
+    .admin-menu button {
+      display: block;
+      width: 100%;
+      margin: 0;
+      padding: 8px 14px;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      color: var(--ink);
+      font-size: 1rem;
+      font-weight: 400;
+      text-align: left;
+      text-decoration: none;
+    }
+    .admin-menu form { margin: 0; padding: 0; border: 0; background: transparent; }
     form, .card {
       background: var(--card);
       border: 1px solid var(--line);
@@ -103,6 +138,20 @@
   <header>
     <img src="/assets/logo.svg" alt="">
     <a href="/">DocPilot</a>
+    {% if signed_in %}
+    <details class="admin-menu">
+      <summary>Admin</summary>
+      <div>
+        <a href="/admin">Documents</a>
+        <a href="/admin/reset">Reset Catalog</a>
+        <a href="/admin/password">Change Password</a>
+        <form method="post" action="/admin/logout">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <button type="submit">Sign Out</button>
+        </form>
+      </div>
+    </details>
+    {% endif %}
   </header>
   <main>
     {% block body %}{% endblock %}

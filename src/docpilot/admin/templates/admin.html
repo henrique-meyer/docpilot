@@ -2,19 +2,8 @@
 {% block title %}Documents · DocPilot admin{% endblock %}
 {% block extra_head %}{% if processing %}<meta http-equiv="refresh" content="2">{% endif %}{% endblock %}
 {% block body %}
-  <div class="top">
-    <div>
-      <h1>Documents</h1>
-      <p>A PDF is saved to storage and added to the catalog only after that upload is confirmed. Chunking and indexing run after that. The bar uses extracted text size against the 50 MB Free-tier limit.</p>
-    </div>
-    <div>
-      <p><a href="/admin/password">Password</a></p>
-      <form method="post" action="/admin/logout">
-        <input type="hidden" name="csrf" value="{{ csrf }}">
-        <button class="quiet" type="submit">Sign out</button>
-      </form>
-    </div>
-  </div>
+  <h1>Documents</h1>
+  <p>A PDF is saved to storage and added to the catalog only after that upload is confirmed. Chunking and indexing run after that. The bar uses extracted text size against the 50 MB Free-tier limit.</p>
   {% if error %}<div class="banner error">{{ error }}</div>{% endif %}
   {% if notice %}<div class="banner notice">{{ notice }}</div>{% endif %}
 
@@ -61,7 +50,6 @@
   </form>
 
   <h2>Catalog</h2>
-  <p><a class="danger" href="/admin/reset">Reset catalog</a></p>
   {% if documents %}
   <table>
     <thead>
