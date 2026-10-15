@@ -11,6 +11,7 @@ import uuid
 from datetime import UTC, datetime
 
 from docpilot.config import Settings
+from docpilot.documents.describe import read_title, read_year
 from docpilot.documents.errors import MESSAGES, DocumentError
 from docpilot.documents.models import AuditEvent, DocumentRecord
 from docpilot.documents.pdf import extract_pdf
@@ -54,20 +55,13 @@ class DocumentService:
     def source_bytes_used(self) -> int:
         return sum(record.source_bytes for record in self.store.list_records())
 
-    def begin_upload(
-        self,
-        data: bytes,
-        *,
-        title: str,
-        source: str,
-        year: str | None,
-    ) -> DocumentRecord:
+    def begin_upload(self, data: bytes, *, source: str) -> DocumentRecord:
         self.validate_upload(data)
         record = DocumentRecord(
             id=uuid.uuid4().hex,
-            title=_clean(title, fallback=_title_from_source(source)),
+            title=read_title(data),
             source=_clean(source, fallback="upload.pdf"),
-            year=_clean_year(year),
+            year=read_year(data),
             pages=0,
             chunk_count=0,
             index_bytes=0,
@@ -144,14 +138,7 @@ class DocumentService:
             self.store.delete_record(document_id)
             self._audit("delete", document_id, record.title)
 
-    def finish_replace(
-        self,
-        document_id: str,
-        data: bytes,
-        *,
-        title: str,
-        year: str | None,
-    ) -> None:
+    def finish_replace(self, document_id: str, data: bytes) -> None:
         try:
             self.validate_upload(data)
         except DocumentError as exc:
@@ -178,8 +165,8 @@ class DocumentService:
                 return
             current.status = "processing"
             current.error = None
-            current.title = _clean(title, fallback=current.title)
-            current.year = _clean_year(year) if year is not None else current.year
+            current.title = read_title(data)
+            current.year = read_year(data)
             current.source_bytes = len(data)
             self.store.put_record(current)
             try:
@@ -250,19 +237,3 @@ def _clean(value: str, *, fallback: str) -> str:
     if not text:
         text = fallback
     return text[:200]
-
-
-def _clean_year(value: str | None) -> str | None:
-    if value is None:
-        return None
-    text = " ".join(value.split()).strip()
-    if not text:
-        return None
-    return text[:32]
-
-
-def _title_from_source(source: str) -> str:
-    name = source.rsplit("/", 1)[-1].rsplit("\\", 1)[-1]
-    if name.lower().endswith(".pdf"):
-        name = name[:-4]
-    return name or "Untitled"

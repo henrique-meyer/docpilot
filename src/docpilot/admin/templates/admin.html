@@ -18,34 +18,18 @@
   <h2>Upload a PDF</h2>
   <form method="post" action="/admin/api/documents" enctype="multipart/form-data">
     <input type="hidden" name="csrf" value="{{ csrf }}">
-    <div class="row">
-      <label>PDF
-        <input type="file" name="file" accept="application/pdf,.pdf" required>
-      </label>
-      <label>Title
-        <input type="text" name="title" maxlength="200">
-      </label>
-      <label>Year
-        <input type="text" name="year" maxlength="32" placeholder="Optional">
-      </label>
-    </div>
+    <label>PDF
+      <input type="file" name="file" accept="application/pdf,.pdf" required>
+    </label>
     <button type="submit">Upload</button>
   </form>
 
   <h2>Add by URL</h2>
   <form method="post" action="/admin/api/documents/url">
     <input type="hidden" name="csrf" value="{{ csrf }}">
-    <div class="row">
-      <label>PDF URL
-        <input type="url" name="url" required placeholder="https://example.gov/guide.pdf">
-      </label>
-      <label>Title
-        <input type="text" name="title" maxlength="200">
-      </label>
-      <label>Year
-        <input type="text" name="year" maxlength="32" placeholder="Optional">
-      </label>
-    </div>
+    <label>PDF URL
+      <input type="url" name="url" required placeholder="https://example.gov/guide.pdf">
+    </label>
     <button type="submit">Add URL</button>
   </form>
 
@@ -68,7 +52,7 @@
     <tbody>
       {% for doc in documents %}
       <tr>
-        <td>{{ doc.title }}{% if doc.error %}<br><span class="banner error">{{ doc.error }}</span>{% endif %}</td>
+        <td>{{ doc.title or "—" }}{% if doc.error %}<br><span class="banner error">{{ doc.error }}</span>{% endif %}</td>
         <td>
           {% if doc.source.startswith("http://") or doc.source.startswith("https://") %}
           <a href="{{ doc.source }}">{{ doc.source }}</a>
@@ -85,8 +69,6 @@
         <td class="actions">
           <form method="post" action="/admin/api/documents/{{ doc.id }}/replace" enctype="multipart/form-data">
             <input type="hidden" name="csrf" value="{{ csrf }}">
-            <input type="hidden" name="title" value="{{ doc.title }}">
-            <input type="hidden" name="year" value="{{ doc.year or '' }}">
             <label>Replace PDF
               <input type="file" name="file" accept="application/pdf,.pdf" required>
             </label>

@@ -233,7 +233,7 @@ A signed-in admin opens a page and sets a new password. The hash is replaced. Th
 
 Found Thursday 15 October 2026.
 
-Remove Title and Year from the upload, URL, and replace forms. Ingest reads them from the PDF metadata and text. Upload and seed use the same reading.
+Remove Title and Year from the upload, URL, and replace forms. A title is stored only when the PDF metadata has one. A year is stored only when that title contains one. Otherwise both stay empty. The file name is not used as a title, and a year printed in the body is not guessed. Upload and seed use the same reading. The catalog shows an em dash for an empty title or year.
 
 ### DOCPILOT-23 — Add the public header to admin
 
