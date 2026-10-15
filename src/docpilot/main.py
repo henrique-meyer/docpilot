@@ -1,5 +1,8 @@
 """DocPilot API. Health and questions are public. Document management lives under /admin."""
 
+import threading
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -21,6 +24,19 @@ from docpilot.observe import configure_logging, configure_tracing
 from docpilot.retrieve.retriever import build_retriever
 
 
+def _resume_on_startup(app: FastAPI) -> None:
+    if getattr(app.state, "resume_started", False):
+        return
+    app.state.resume_started = True
+    pending = app.state.documents.incomplete_ids()
+    threading.Thread(
+        target=app.state.documents.resume_ids,
+        args=(pending,),
+        name="docpilot-resume",
+        daemon=True,
+    ).start()
+
+
 def create_app(
     settings: Settings | None = None,
     store: DocumentStore | None = None,
@@ -30,7 +46,13 @@ def create_app(
     resolved = settings or Settings.from_env()
     configure_logging()
     configure_tracing(resolved)
-    app = FastAPI(title="DocPilot")
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        _resume_on_startup(app)
+        yield
+
+    app = FastAPI(title="DocPilot", lifespan=lifespan)
     login = AdminLogin(build_login_store(resolved), resolved)
     app.state.admin_login = login
     app.state.settings = login.settings

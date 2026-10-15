@@ -7,6 +7,7 @@ new chunks are upserted. The 50 MB cap uses extracted text size.
 
 import logging
 import threading
+import time
 import uuid
 from datetime import UTC, datetime
 
@@ -23,10 +24,32 @@ from docpilot.documents.models import (
     empty_summary,
 )
 from docpilot.documents.pdf import extract_pdf
-from docpilot.documents.store import DocumentStore
+from docpilot.documents.store import DocumentStore, IndexClaim
 from docpilot.ingest.pipeline import Ingestor, MemoryIndex
 
 logger = logging.getLogger(__name__)
+
+
+class _RenewedClaim:
+    def __init__(self, claim: IndexClaim, document_id: str) -> None:
+        self._claim = claim
+        self._stop = threading.Event()
+        threading.Thread(
+            target=self._beat,
+            name=f"docpilot-claim-{document_id[:8]}",
+            daemon=True,
+        ).start()
+
+    def _beat(self) -> None:
+        while not self._stop.wait(20):
+            try:
+                self._claim.renew()
+            except Exception:
+                logger.exception("could not renew an index claim")
+
+    def release(self) -> None:
+        self._stop.set()
+        self._claim.release()
 
 
 def utc_now() -> str:
@@ -154,37 +177,14 @@ class DocumentService:
             record.error = None
             self.store.put_record(record)
             self._audit("upload", record.id, _label(record))
-            try:
-                info = extract_pdf(data)
-                self._ensure_capacity(info.index_bytes, excluding=document_id)
-                result = self.ingestor.ingest(
-                    data,
-                    document_id=document_id,
-                    title=record.title,
-                    source=record.source,
-                    year=record.year,
-                )
-                record.pages = info.pages
-                record.chunk_count = result.chunk_count
-                record.index_bytes = info.index_bytes
-                record.source_bytes = len(data)
-                record.ingested_at = utc_now()
-                record.status = "ready"
-                record.error = None
-                self.store.put_record(record)
-                self._audit("processed", record.id, _label(record))
-            except DocumentError as exc:
-                record.index_bytes = 0
-                record.status = "failed"
-                record.error = MESSAGES.get(exc.code, MESSAGES["not_pdf"])
-                self.store.put_record(record)
-                self._audit("failed", record.id, record.error)
-            except Exception:
-                logger.exception("upload failed for %s", document_id)
-                record.status = "failed"
-                record.error = MESSAGES["index_failed"]
-                self.store.put_record(record)
-                self._audit("failed", record.id, record.error)
+            self._index_held(
+                record,
+                data,
+                success_action="processed",
+                failure_action="failed",
+                failure_fallback=MESSAGES["not_pdf"],
+                zero_index=True,
+            )
 
     def reset(self) -> None:
         with self._lock:
@@ -232,36 +232,154 @@ class DocumentService:
             current.year = read_year(data)
             current.source_bytes = len(data)
             self.store.put_record(current)
-            try:
-                info = extract_pdf(data)
-                self._ensure_capacity(info.index_bytes, excluding=document_id)
-                result = self.ingestor.ingest(
-                    data,
-                    document_id=document_id,
-                    title=current.title,
-                    source=current.source,
-                    year=current.year,
-                )
-                current.chunk_count = result.chunk_count
-                current.pages = info.pages
-                current.index_bytes = info.index_bytes
-                current.source_bytes = len(data)
-                current.ingested_at = utc_now()
-                current.status = "ready"
-                current.error = None
-                self.store.put_record(current)
-                self._audit("replace", current.id, current.title)
-            except DocumentError as exc:
-                current.status = "failed"
-                current.error = MESSAGES.get(exc.code, "Replace failed.")
-                self.store.put_record(current)
-                self._audit("replace_failed", document_id, current.error)
-            except Exception:
-                logger.exception("replace failed for %s", document_id)
-                current.status = "failed"
-                current.error = MESSAGES["index_failed"]
-                self.store.put_record(current)
-                self._audit("replace_failed", document_id, current.error)
+            self._index_held(
+                current,
+                data,
+                success_action="replace",
+                failure_action="replace_failed",
+                failure_fallback="Replace failed.",
+                zero_index=False,
+            )
+
+    def incomplete_ids(self) -> list[str]:
+        return [
+            record.id
+            for record in self.store.list_records()
+            if record.status in {"queued", "processing"}
+        ]
+
+    def resume_ids(self, document_ids: list[str]) -> None:
+        for document_id in document_ids:
+            for attempt in range(4):
+                if self._resume_one(document_id):
+                    break
+                if attempt < 3:
+                    time.sleep(15)
+
+    def begin_retry(self, document_id: str) -> None:
+        with self._lock:
+            record = self.store.get_record(document_id)
+            if record is None:
+                raise DocumentError("not_found")
+            if record.status != "failed":
+                raise DocumentError("not_failed")
+            if self.store.get_pdf(document_id) is None:
+                record.error = MESSAGES["store_failed"]
+                self.store.put_record(record)
+                self._audit("failed", record.id, record.error)
+                raise DocumentError("store_failed")
+            record.status = "processing"
+            record.error = None
+            self.store.put_record(record)
+            self._audit("retry", record.id, _label(record))
+
+    def index_stored(self, document_id: str) -> bool:
+        record = self.store.get_record(document_id)
+        if record is None or record.status not in {"queued", "processing"}:
+            return True
+        data = self.store.get_pdf(document_id)
+        if data is None:
+            self._mark_failed(document_id, "failed", MESSAGES["store_failed"], zero_index=True)
+            return True
+        with self._lock:
+            current = self.store.get_record(document_id)
+            if current is None or current.status not in {"queued", "processing"}:
+                return True
+            return self._index_held(
+                current,
+                data,
+                success_action="processed",
+                failure_action="failed",
+                failure_fallback=MESSAGES["not_pdf"],
+                zero_index=True,
+            )
+
+    def _resume_one(self, document_id: str) -> bool:
+        record = self.store.get_record(document_id)
+        if record is None or record.status not in {"queued", "processing"}:
+            return True
+        if self.store.get_pdf(document_id) is None:
+            self._mark_failed(document_id, "failed", MESSAGES["store_failed"], zero_index=True)
+            return True
+        return self.index_stored(document_id)
+
+    def _index_held(
+        self,
+        record: DocumentRecord,
+        data: bytes,
+        *,
+        success_action: str,
+        failure_action: str,
+        failure_fallback: str,
+        zero_index: bool,
+    ) -> bool:
+        claim = self._keep_claim(record.id)
+        if claim is None:
+            return False
+        try:
+            info = extract_pdf(data)
+            self._ensure_capacity(info.index_bytes, excluding=record.id)
+            result = self.ingestor.ingest(
+                data,
+                document_id=record.id,
+                title=record.title,
+                source=record.source,
+                year=record.year,
+            )
+            current = self.store.get_record(record.id)
+            if current is None:
+                self.ingestor.delete(record.id)
+                return True
+            current.pages = info.pages
+            current.chunk_count = result.chunk_count
+            current.index_bytes = info.index_bytes
+            current.source_bytes = len(data)
+            current.ingested_at = utc_now()
+            current.status = "ready"
+            current.error = None
+            self.store.put_record(current)
+            detail = current.title if success_action == "replace" else _label(current)
+            self._audit(success_action, current.id, detail)
+            return True
+        except DocumentError as exc:
+            message = MESSAGES.get(exc.code, failure_fallback)
+            self._mark_failed(record.id, failure_action, message, zero_index=zero_index)
+            return True
+        except Exception:
+            logger.exception("index failed for %s", record.id)
+            self._mark_failed(
+                record.id,
+                failure_action,
+                MESSAGES["index_failed"],
+                zero_index=zero_index,
+            )
+            return True
+        finally:
+            claim.release()
+
+    def _keep_claim(self, document_id: str) -> _RenewedClaim | None:
+        claim = self.store.claim_index(document_id)
+        if claim is None:
+            return None
+        return _RenewedClaim(claim, document_id)
+
+    def _mark_failed(
+        self,
+        document_id: str,
+        action: str,
+        message: str,
+        *,
+        zero_index: bool,
+    ) -> None:
+        record = self.store.get_record(document_id)
+        if record is None:
+            return
+        if zero_index:
+            record.index_bytes = 0
+        record.status = "failed"
+        record.error = message
+        self.store.put_record(record)
+        self._audit(action, record.id, message)
 
     def _discard_upload(self, document_id: str) -> None:
         with self._lock:
