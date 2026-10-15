@@ -377,6 +377,20 @@ The public homepage shows the saved catalog summary at the top of the ask box. T
 
 A visitor can read this block without signing in. They cannot change it. The admin save and draft routes stay signed-in only. Changing the saved summary changes what the homepage shows on the next visit.
 
+### DOCPILOT-42 — Make the catalog table full width
+
+Found Thursday 15 October 2026.
+
+The catalog table on the admin documents page stretches to the full width of its panel. Columns stay in the same order. A narrow window still scrolls the panel rather than leaving the table short of the right edge.
+
+### DOCPILOT-43 — Show timestamps in the user's timezone
+
+Found Thursday 15 October 2026.
+
+Every timestamp shown in the app is formatted in the timezone of the browser. The catalog stored time and the audit log use that timezone. Any other timestamp on a page does too.
+
+The stored value stays UTC. A person in another timezone sees the same instant in their own zone. An empty timestamp stays an em dash.
+
 ## Issue index
 
 | Key | Summary | Due | URL |
@@ -422,3 +436,5 @@ A visitor can read this block without signing in. They cannot change it. The adm
 | DOCPILOT-39 | Record upload and processing as separate audit events | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-39 |
 | DOCPILOT-40 | Join words split by PDF line breaks | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-40 |
 | DOCPILOT-41 | Show the catalog summary above the ask box | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-41 |
+| DOCPILOT-42 | Make the catalog table full width | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-42 |
+| DOCPILOT-43 | Show timestamps in the user's timezone | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-43 |
