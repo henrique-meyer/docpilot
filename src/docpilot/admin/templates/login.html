@@ -1,11 +1,11 @@
 {% extends "base.html" %}
-{% block title %}Sign in · DocPilot admin{% endblock %}
+{% block title %}Login{% endblock %}
 {% block body %}
-  <h1>DocPilot admin</h1>
+  <h1>Login</h1>
   {% if setup %}
   <p>No admin password is set yet. The first person to save one becomes the admin. Use at least 8 characters.</p>
   {% else %}
-  <p>One password protects document upload, replace, and delete.</p>
+  <p>Manage source documents.</p>
   {% endif %}
   {% if notice %}<div class="banner notice">{{ notice }}</div>{% endif %}
   {% if error %}<div class="banner error">{{ error }}</div>{% endif %}

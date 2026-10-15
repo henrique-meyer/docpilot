@@ -271,6 +271,12 @@ Found Thursday 15 October 2026.
 
 The change-password page has a Cancel control next to Update password. Cancel returns to `/admin` and does not change the password.
 
+### DOCPILOT-31 — Name the admin header and simplify the login page
+
+Found Thursday 15 October 2026.
+
+The admin header says DocPilot Admin. The login page heading is Login. The line under it is Manage source documents.
+
 ## Issue index
 
 | Key | Summary | Due | URL |
@@ -303,3 +309,4 @@ The change-password page has a Cancel control next to Update password. Cancel re
 | DOCPILOT-26 | Export PNG copies of the logo | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-26 |
 | DOCPILOT-29 | Add an Admin menu to the header | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-29 |
 | DOCPILOT-30 | Add Cancel to the change-password page | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-30 |
+| DOCPILOT-31 | Name the admin header and simplify the login page | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-31 |
