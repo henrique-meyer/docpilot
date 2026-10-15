@@ -253,6 +253,12 @@ Found Thursday 15 October 2026.
 
 Admin success and error messages are not query parameters. A redirect carries the message in a short-lived HttpOnly cookie, the next page shows it once, and the address bar stays `/admin` or `/admin/login`. A refresh shows nothing. The status poll keeps the cookie only while a document is still queued or processing. JSON clients still get the JSON body.
 
+### DOCPILOT-26 — Export PNG copies of the logo
+
+Found Thursday 15 October 2026.
+
+Export `assets/logo.png` from `assets/logo.svg` and `assets/logo-mark.png` from `assets/logo-mark.svg`. Render the existing SVG files. Do not redraw the mark. The tile keeps the navy square. The mark stays on a transparent background.
+
 ## Issue index
 
 | Key | Summary | Due | URL |
@@ -282,3 +288,4 @@ Admin success and error messages are not query parameters. A redirect carries th
 | DOCPILOT-23 | Add the public header to admin | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-23 |
 | DOCPILOT-24 | Use gpt-6.1-sol for chat and the judge | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-24 |
 | DOCPILOT-25 | Keep admin messages out of the address bar | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-25 |
+| DOCPILOT-26 | Export PNG copies of the logo | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-26 |
