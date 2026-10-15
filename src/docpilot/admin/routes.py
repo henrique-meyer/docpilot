@@ -8,12 +8,16 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Resp
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from docpilot.admin.auth import (
+    FLASH,
     LoginGuard,
+    clear_flash,
     clear_session,
     client_address,
     csrf_matches,
     password_matches,
+    read_flash,
     read_session,
+    write_flash,
     write_session,
 )
 from docpilot.admin.bootstrap import MIN_PASSWORD_CHARS, AdminLogin
@@ -83,7 +87,7 @@ def _no_store(response: Response) -> Response:
 def _error_response(request: Request, code: str, status_code: int) -> Response:
     if _wants_json(request):
         return _no_store(JSONResponse({"error": code, "message": MESSAGES[code]}, status_code=status_code))
-    return _no_store(RedirectResponse(f"/admin?error={code}", status_code=303))
+    return _redirect(request, "/admin", error=code)
 
 
 def _render(name: str, status_code: int = 200, **context: object) -> HTMLResponse:
@@ -115,8 +119,34 @@ def _login_page(
 
 
 def _attach_cookie(page: HTMLResponse, probe: Response) -> HTMLResponse:
-    page.headers["set-cookie"] = probe.headers["set-cookie"]
+    raw = probe.headers.get("set-cookie")
+    if raw:
+        page.headers.append("set-cookie", raw)
     return page
+
+
+def _take_flash(request: Request) -> tuple[str, str, bool]:
+    settings = _settings(request)
+    present = FLASH in request.cookies
+    found = read_flash(request, settings)
+    notice = ""
+    error = ""
+    if found is not None:
+        kind, code = found
+        if kind == "notice":
+            notice = NOTICES.get(code, "")
+        else:
+            error = MESSAGES.get(code, "")
+    return notice, error, present
+
+
+def _redirect(request: Request, location: str, *, notice: str = "", error: str = "") -> Response:
+    response = RedirectResponse(location, status_code=303)
+    if notice:
+        write_flash(response, _settings(request), "notice", notice)
+    elif error:
+        write_flash(response, _settings(request), "error", error)
+    return _no_store(response)
 
 
 def _anonymous_denied(request: Request) -> Response:
@@ -145,39 +175,49 @@ def _require_csrf(request: Request, provided: str) -> Response | None:
     if _wants_json(request):
         return _no_store(JSONResponse({"error": "csrf", "message": MESSAGES["csrf"]}, status_code=403))
     if request.url.path.startswith("/admin/api"):
-        return _no_store(RedirectResponse("/admin?error=csrf", status_code=303))
+        return _redirect(request, "/admin", error="csrf")
     return _login_page(status_code=403, error=MESSAGES["csrf"], csrf=session.csrf if session else "")
 
 
 @router.get("/admin/login")
 def login_form(request: Request) -> Response:
     settings = _settings(request)
-    notice = NOTICES.get(request.query_params.get("notice", ""), "")
     if not settings.admin_configured:
-        return _setup_form(request, notice=notice)
+        return _setup_form(request)
     if _signed_in(request):
         return RedirectResponse("/admin", status_code=303)
+    notice, error, present = _take_flash(request)
     probe = Response()
     csrf = write_session(probe, settings, None)
-    page = _login_page(csrf=csrf, notice=notice)
+    page = _login_page(csrf=csrf, notice=notice, error=error)
+    if present:
+        clear_flash(page, settings)
     return _attach_cookie(page, probe)
 
 
-def _setup_form(request: Request, *, notice: str = "", error: str = "", status_code: int = 200) -> HTMLResponse:
+def _setup_form(request: Request, *, error: str = "", status_code: int = 200) -> HTMLResponse:
     signing = _login_state(request).prepare()
+    notice, flash_error, present = _take_flash(request)
+    if not error:
+        error = flash_error
     session = read_session(request, signing)
     if session is None:
         probe = Response()
         csrf = write_session(probe, signing, None)
         page = _login_page(status_code=status_code, error=error, csrf=csrf, notice=notice, setup=True)
+        if present:
+            clear_flash(page, signing)
         return _attach_cookie(page, probe)
-    return _login_page(
+    page = _login_page(
         status_code=status_code,
         error=error,
         csrf=session.csrf,
         notice=notice,
         setup=True,
     )
+    if present:
+        clear_flash(page, signing)
+    return page
 
 
 @router.post("/admin/setup")
@@ -254,9 +294,9 @@ def logout(request: Request, csrf: str = Form("")) -> Response:
     denied = _require_csrf(request, csrf)
     if denied is not None:
         return denied
-    response = RedirectResponse("/admin/login?notice=logged_out", status_code=303)
+    response = _redirect(request, "/admin/login", notice="logged_out")
     clear_session(response, _settings(request))
-    return _no_store(response)
+    return response
 
 
 @router.get("/admin")
@@ -266,10 +306,10 @@ def admin_page(request: Request) -> Response:
         return denied
     session = read_session(request, _settings(request))
     service = _service(request)
-    error_code = request.query_params.get("error", "")
-    notice_code = request.query_params.get("notice", "")
+    notice, error, present = _take_flash(request)
     documents = service.list_documents()
-    return _render(
+    processing = any(item.status in {"queued", "processing"} for item in documents)
+    page = _render(
         "admin.html",
         csrf=session.csrf if session else "",
         documents=documents,
@@ -278,10 +318,13 @@ def admin_page(request: Request) -> Response:
         source_bytes=service.source_bytes_used(),
         index_limit=service.settings.index_limit_bytes,
         percent=_percent(service.index_bytes_used(), service.settings.index_limit_bytes),
-        error=MESSAGES.get(error_code, ""),
-        notice=NOTICES.get(notice_code, ""),
-        processing=any(item.status in {"queued", "processing"} for item in documents),
+        error=error,
+        notice=notice,
+        processing=processing,
     )
+    if present and not processing:
+        clear_flash(page, _settings(request))
+    return page
 
 
 @router.get("/admin/api/documents")
@@ -422,7 +465,7 @@ def reset_catalog(request: Request, csrf: str = Form(""), confirm: str = Form(""
     if confirm != "yes":
         return _no_store(RedirectResponse("/admin", status_code=303))
     _service(request).reset()
-    return _no_store(RedirectResponse("/admin?notice=reset", status_code=303))
+    return _redirect(request, "/admin", notice="reset")
 
 
 def _delete(document_id: str, request: Request, csrf: str) -> Response:
@@ -438,7 +481,7 @@ def _delete(document_id: str, request: Request, csrf: str) -> Response:
         return _error_response(request, exc.code, 404)
     if _wants_json(request):
         return _no_store(JSONResponse({"ok": True}))
-    return _no_store(RedirectResponse("/admin?notice=deleted", status_code=303))
+    return _redirect(request, "/admin", notice="deleted")
 
 
 def _queue_upload(
@@ -466,7 +509,7 @@ def _accepted(request: Request, notice: str, body: dict[str, object] | None = No
         if body is not None:
             payload = body
         return _no_store(JSONResponse(payload, status_code=202))
-    return _no_store(RedirectResponse(f"/admin?notice={notice}", status_code=303))
+    return _redirect(request, "/admin", notice=notice)
 
 
 def _percent(used: int, limit: int) -> int:

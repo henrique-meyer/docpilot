@@ -17,6 +17,7 @@ from starlette.responses import Response
 from docpilot.config import Settings
 
 COOKIE = "docpilot_session"
+FLASH = "docpilot_flash"
 _HASHER = PasswordHasher()
 
 
@@ -106,6 +107,44 @@ def clear_session(response: Response, settings: Settings) -> None:
     response.delete_cookie(COOKIE, path="/", secure=settings.cookie_secure, httponly=True, samesite="lax")
 
 
+def read_flash(request: Request, settings: Settings) -> tuple[str, str] | None:
+    if not settings.session_secret:
+        return None
+    token = request.cookies.get(FLASH)
+    if not token:
+        return None
+    try:
+        raw = _flash_serializer(settings).loads(token, max_age=120)
+    except (BadSignature, SignatureExpired):
+        return None
+    if not isinstance(raw, dict):
+        return None
+    kind = raw.get("kind")
+    code = raw.get("code")
+    if kind not in {"notice", "error"} or not isinstance(code, str) or not code:
+        return None
+    return kind, code
+
+
+def write_flash(response: Response, settings: Settings, kind: str, code: str) -> None:
+    if not settings.session_secret:
+        return
+    token = _flash_serializer(settings).dumps({"kind": kind, "code": code})
+    response.set_cookie(
+        FLASH,
+        token,
+        max_age=120,
+        httponly=True,
+        secure=settings.cookie_secure,
+        samesite="lax",
+        path="/",
+    )
+
+
+def clear_flash(response: Response, settings: Settings) -> None:
+    response.delete_cookie(FLASH, path="/", secure=settings.cookie_secure, httponly=True, samesite="lax")
+
+
 def client_address(request: Request) -> str:
     forwarded = request.headers.get("x-forwarded-for", "")
     if forwarded:
@@ -125,3 +164,7 @@ def csrf_matches(session: Session | None, provided: str) -> bool:
 
 def _serializer(settings: Settings) -> URLSafeTimedSerializer:
     return URLSafeTimedSerializer(settings.session_secret, salt="docpilot-admin-session")
+
+
+def _flash_serializer(settings: Settings) -> URLSafeTimedSerializer:
+    return URLSafeTimedSerializer(settings.session_secret, salt="docpilot-admin-flash")

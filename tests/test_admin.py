@@ -203,6 +203,94 @@ def test_upload_replace_and_delete(tmp_path: Path) -> None:
     assert all("correct-horse" not in (event.detail or "") for event in store.audit)
 
 
+def test_admin_messages_stay_out_of_the_address_bar(tmp_path: Path) -> None:
+    store = MemoryDocumentStore()
+    client = _app(tmp_path, store)
+    csrf = _sign_in(client)
+    uploaded = client.post(
+        "/admin/api/documents",
+        data={"csrf": csrf, "title": "Visitor guide", "year": "2026"},
+        files={"file": ("guide.pdf", _pdf(), "application/pdf")},
+        follow_redirects=False,
+    )
+    assert uploaded.status_code == 303
+    assert uploaded.headers["location"] == "/admin"
+    cookie = uploaded.headers["set-cookie"].lower()
+    assert "docpilot_flash" in cookie
+    assert "httponly" in cookie
+    assert "samesite=lax" in cookie
+    record = store.list_records()[0]
+    record.status = "processing"
+    polling = client.get("/admin")
+    assert "The file is stored" in polling.text
+    assert polling.url.path == "/admin"
+    assert not polling.url.query
+    still = client.get("/admin")
+    assert "The file is stored" in still.text
+    record.status = "ready"
+    finished = client.get("/admin")
+    assert "The file is stored" in finished.text
+    quiet = client.get("/admin")
+    assert "The file is stored" not in quiet.text
+
+    stale = client.get("/admin?notice=deleted&error=not_pdf")
+    assert "Document deleted." not in stale.text
+    assert "not a PDF" not in stale.text
+
+    rejected = client.post(
+        "/admin/api/documents",
+        data={"csrf": _csrf(quiet.text)},
+        files={"file": ("notes.txt", b"hello", "text/plain")},
+        follow_redirects=False,
+    )
+    assert rejected.headers["location"] == "/admin"
+    failed = client.get("/admin")
+    assert "not a PDF" in failed.text
+    assert failed.url.path == "/admin"
+    assert not failed.url.query
+    assert "not a PDF" not in client.get("/admin").text
+
+    page = client.get("/admin")
+    document_id = store.list_records()[0].id
+    deleted = client.post(
+        f"/admin/api/documents/{document_id}/delete",
+        data={"csrf": _csrf(page.text)},
+        follow_redirects=False,
+    )
+    assert deleted.headers["location"] == "/admin"
+    gone = client.get("/admin")
+    assert "Document deleted." in gone.text
+    assert "Document deleted." not in client.get("/admin").text
+
+    signed_out = client.post(
+        "/admin/logout",
+        data={"csrf": _csrf(gone.text)},
+        follow_redirects=False,
+    )
+    assert signed_out.headers["location"] == "/admin/login"
+    login = client.get("/admin/login")
+    assert "Signed out." in login.text
+    assert login.url.path == "/admin/login"
+    assert not login.url.query
+    assert "Signed out." not in client.get("/admin/login").text
+
+    api = client.post(
+        "/admin/login",
+        data={"password": PASSWORD, "csrf": _csrf(client.get("/admin/login").text)},
+        follow_redirects=False,
+    )
+    assert api.status_code == 303
+    csrf = _csrf(client.get("/admin").text)
+    queued = client.post(
+        "/admin/api/documents",
+        data={"csrf": csrf, "title": "API"},
+        files={"file": ("api.pdf", _pdf(), "application/pdf")},
+        headers={"Accept": "application/json"},
+    )
+    assert queued.status_code == 202
+    assert "docpilot_flash" not in queued.headers.get("set-cookie", "")
+
+
 def test_upload_stops_at_the_index_limit(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
     def oversized(_data: bytes) -> PdfInfo:
         return PdfInfo(pages=1, index_bytes=40)
