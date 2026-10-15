@@ -87,8 +87,25 @@ def _no_store(response: Response) -> Response:
 
 def _error_response(request: Request, code: str, status_code: int) -> Response:
     if _wants_json(request):
-        return _no_store(JSONResponse({"error": code, "message": MESSAGES[code]}, status_code=status_code))
+        return _json_error(code, status_code)
     return _redirect(request, "/admin", error=code)
+
+
+def _json_error(code: str, status_code: int) -> JSONResponse:
+    return _no_store(JSONResponse({"error": code, "message": MESSAGES[code]}, status_code=status_code))
+
+
+def _json_next(location: str, message: str = "") -> JSONResponse:
+    payload: dict[str, object] = {"ok": True, "next": location}
+    if message:
+        payload["message"] = message
+    return _no_store(JSONResponse(payload))
+
+
+def _form_error(request: Request, code: str, status_code: int, html: Response) -> Response:
+    if _wants_json(request):
+        return _json_error(code, status_code)
+    return html
 
 
 def _render(name: str, status_code: int = 200, **context: object) -> HTMLResponse:
@@ -152,7 +169,7 @@ def _redirect(request: Request, location: str, *, notice: str = "", error: str =
 
 def _anonymous_denied(request: Request) -> Response:
     if _wants_json(request) or request.method == "GET":
-        return _no_store(JSONResponse({"error": "unauthorized"}, status_code=401))
+        return _json_error("unauthorized", 401)
     return _no_store(RedirectResponse("/admin/login", status_code=303))
 
 
@@ -160,10 +177,10 @@ def _require_admin(request: Request) -> Response | None:
     settings = _settings(request)
     if not settings.admin_configured:
         if _wants_json(request) or request.url.path.startswith("/admin/api"):
-            return _no_store(JSONResponse({"error": "not_configured"}, status_code=503))
+            return _json_error("not_configured", 503)
         return _no_store(RedirectResponse("/admin/login", status_code=303))
     if not _signed_in(request):
-        if request.url.path.startswith("/admin/api"):
+        if _wants_json(request) or request.url.path.startswith("/admin/api"):
             return _anonymous_denied(request)
         return _no_store(RedirectResponse("/admin/login", status_code=303))
     return None
@@ -230,23 +247,45 @@ def setup_admin(
 ) -> Response:
     login = _login_state(request)
     if login.settings.admin_configured:
+        if _wants_json(request):
+            return _json_error("already_set", 409)
         return _no_store(RedirectResponse("/admin/login", status_code=303))
     signing = login.prepare()
     session = read_session(request, signing)
     if not csrf_matches(session, csrf):
-        return _setup_form(request, error=MESSAGES["csrf"], status_code=403)
+        return _form_error(request, "csrf", 403, _setup_form(request, error=MESSAGES["csrf"], status_code=403))
     if len(password) < MIN_PASSWORD_CHARS:
-        return _setup_form(request, error=MESSAGES["password_short"], status_code=400)
+        return _form_error(
+            request,
+            "password_short",
+            400,
+            _setup_form(request, error=MESSAGES["password_short"], status_code=400),
+        )
     if password != confirm:
-        return _setup_form(request, error=MESSAGES["password_mismatch"], status_code=400)
+        return _form_error(
+            request,
+            "password_mismatch",
+            400,
+            _setup_form(request, error=MESSAGES["password_mismatch"], status_code=400),
+        )
     if not login.claim(password):
         if not login.settings.admin_configured:
-            return _setup_form(request, error=MESSAGES["already_set"], status_code=409)
+            return _form_error(
+                request,
+                "already_set",
+                409,
+                _setup_form(request, error=MESSAGES["already_set"], status_code=409),
+            )
+        if _wants_json(request):
+            return _json_error("already_set", 409)
         probe = Response()
         token = write_session(probe, login.settings, None)
         page = _login_page(error=MESSAGES["already_set"], csrf=token)
         return _attach_cookie(page, probe)
-    response = RedirectResponse("/admin", status_code=303)
+    if _wants_json(request):
+        response: Response = _json_next("/admin")
+    else:
+        response = RedirectResponse("/admin", status_code=303)
     write_session(response, login.settings, "admin")
     return _no_store(response)
 
@@ -255,6 +294,8 @@ def setup_admin(
 def login(request: Request, password: str = Form(""), csrf: str = Form("")) -> Response:
     settings = _settings(request)
     if not settings.admin_configured:
+        if _wants_json(request):
+            return _json_error("not_configured", 503)
         return _setup_form(request)
     denied = _require_csrf(request, csrf)
     if denied is not None:
@@ -263,24 +304,34 @@ def login(request: Request, password: str = Form(""), csrf: str = Form("")) -> R
     guard = _guard(request)
     if guard.remaining_lock(client) > 0:
         session = read_session(request, settings)
-        return _login_page(
-            status_code=429,
-            error=MESSAGES["lockout"],
-            csrf=session.csrf if session else "",
+        return _form_error(
+            request,
+            "lockout",
+            429,
+            _login_page(
+                status_code=429,
+                error=MESSAGES["lockout"],
+                csrf=session.csrf if session else "",
+            ),
         )
     if not password_matches(settings.admin_password_hash, password):
         guard.record_failure(client)
         session = read_session(request, settings)
         status = 429 if guard.remaining_lock(client) > 0 else 401
-        message = MESSAGES["lockout"] if status == 429 else MESSAGES["bad_password"]
-        return _login_page(
-            status_code=status,
-            error=message,
-            csrf=session.csrf if session else "",
+        code = "lockout" if status == 429 else "bad_password"
+        return _form_error(
+            request,
+            code,
+            status,
+            _login_page(
+                status_code=status,
+                error=MESSAGES[code],
+                csrf=session.csrf if session else "",
+            ),
         )
     guard.record_success(client)
     if _wants_json(request):
-        response: Response = JSONResponse({"ok": True})
+        response: Response = _json_next("/admin")
     else:
         response = RedirectResponse("/admin", status_code=303)
     write_session(response, settings, "admin")
@@ -295,7 +346,10 @@ def logout(request: Request, csrf: str = Form("")) -> Response:
     denied = _require_csrf(request, csrf)
     if denied is not None:
         return denied
-    response = _redirect(request, "/admin/login", notice="logged_out")
+    if _wants_json(request):
+        response: Response = _json_next("/admin/login", NOTICES["logged_out"])
+    else:
+        response = _redirect(request, "/admin/login", notice="logged_out")
     clear_session(response, _settings(request))
     return response
 
@@ -309,7 +363,6 @@ def admin_page(request: Request) -> Response:
     service = _service(request)
     notice, error, present = _take_flash(request)
     documents = service.list_documents()
-    processing = any(item.status in {"queued", "processing"} for item in documents)
     page = _render(
         "admin.html",
         csrf=session.csrf if session else "",
@@ -321,10 +374,9 @@ def admin_page(request: Request) -> Response:
         percent=_percent(service.index_bytes_used(), service.settings.index_limit_bytes),
         error=error,
         notice=notice,
-        processing=processing,
         signed_in=True,
     )
-    if present and not processing:
+    if present:
         clear_flash(page, _settings(request))
     return page
 
@@ -463,22 +515,34 @@ def change_password(
     session = read_session(request, _settings(request))
     token = session.csrf if session else ""
     if len(password) < MIN_PASSWORD_CHARS:
-        return _render(
-            "password.html",
-            status_code=400,
-            csrf=token,
-            error=MESSAGES["password_short"],
-            signed_in=True,
+        return _form_error(
+            request,
+            "password_short",
+            400,
+            _render(
+                "password.html",
+                status_code=400,
+                csrf=token,
+                error=MESSAGES["password_short"],
+                signed_in=True,
+            ),
         )
     if password != confirm:
-        return _render(
-            "password.html",
-            status_code=400,
-            csrf=token,
-            error=MESSAGES["password_mismatch"],
-            signed_in=True,
+        return _form_error(
+            request,
+            "password_mismatch",
+            400,
+            _render(
+                "password.html",
+                status_code=400,
+                csrf=token,
+                error=MESSAGES["password_mismatch"],
+                signed_in=True,
+            ),
         )
     _login_state(request).change(password)
+    if _wants_json(request):
+        return _json_next("/admin", NOTICES["password_changed"])
     return _redirect(request, "/admin", notice="password_changed")
 
 
@@ -504,8 +568,12 @@ def reset_catalog(request: Request, csrf: str = Form(""), confirm: str = Form(""
     if denied is not None:
         return denied
     if confirm != "yes":
+        if _wants_json(request):
+            return _json_next("/admin")
         return _no_store(RedirectResponse("/admin", status_code=303))
     _service(request).reset()
+    if _wants_json(request):
+        return _json_next("/admin", NOTICES["reset"])
     return _redirect(request, "/admin", notice="reset")
 
 
@@ -521,7 +589,7 @@ def _delete(document_id: str, request: Request, csrf: str) -> Response:
     except DocumentError as exc:
         return _error_response(request, exc.code, 404)
     if _wants_json(request):
-        return _no_store(JSONResponse({"ok": True}))
+        return _no_store(JSONResponse({"ok": True, "message": NOTICES["deleted"]}))
     return _redirect(request, "/admin", notice="deleted")
 
 
@@ -546,7 +614,8 @@ def _accepted(request: Request, notice: str, body: dict[str, object] | None = No
     if _wants_json(request):
         payload: dict[str, object] = {"status": "queued"}
         if body is not None:
-            payload = body
+            payload.update(body)
+        payload["message"] = NOTICES[notice]
         return _no_store(JSONResponse(payload, status_code=202))
     return _redirect(request, "/admin", notice=notice)
 

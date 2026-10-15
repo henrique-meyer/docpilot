@@ -1,21 +1,18 @@
 {% extends "base.html" %}
 {% block title %}Documents · DocPilot admin{% endblock %}
 {% block extra_head %}
-{% if processing %}<meta http-equiv="refresh" content="2">{% endif %}
 <style>
   .dropzone { border-style: dashed; }
   .dropzone.dragover { outline: 2px solid var(--accent); background: #f3faf6; }
-  .dropzone[aria-busy="true"] { opacity: 0.72; }
   #upload-filename { margin: 0; color: var(--ink); }
 </style>
 {% endblock %}
 {% block body %}
   <h1>Documents</h1>
   <p>A PDF is saved to storage and added to the catalog only after that upload is confirmed. Chunking and indexing run after that. The bar uses extracted text size against the 50 MB Free-tier limit.</p>
-  {% if error %}<div class="banner error">{{ error }}</div>{% endif %}
-  {% if notice %}<div class="banner notice">{{ notice }}</div>{% endif %}
+  <div id="page-banner" class="banner {% if error %}error{% else %}notice{% endif %}" {% if not error and not notice %}hidden{% endif %} data-autodismiss>{{ error or notice }}</div>
 
-  <div class="card">
+  <div id="usage-panel" class="card">
     <strong>{{ index_bytes | bytes }}</strong> of {{ index_limit | bytes }} extracted text
     <div class="meter" role="meter" aria-valuemin="0" aria-valuemax="{{ index_limit }}" aria-valuenow="{{ index_bytes }}" aria-label="Extracted text toward the index limit">
       <span style="width: {{ percent }}%"></span>
@@ -30,61 +27,31 @@
       <input id="upload-file" type="file" name="file" accept="application/pdf,.pdf" required>
     </label>
     <p id="upload-filename">Choose a PDF or drop it here.</p>
+    <div id="upload-progress" class="meter upload-meter" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-label="Upload progress" hidden>
+      <span id="upload-progress-bar"></span>
+    </div>
     <p id="upload-state" role="status" hidden></p>
   </form>
   <script>
     (function () {
       var form = document.getElementById("upload-form");
       var input = document.getElementById("upload-file");
-      var filename = document.getElementById("upload-filename");
-      var state = document.getElementById("upload-state");
-      var sending = false;
-
-      function showFilename(file) {
-        filename.textContent = file.name;
-      }
-
-      function showState(message, kind) {
-        state.hidden = false;
-        state.className = "banner " + kind;
-        state.textContent = message;
-      }
-
-      function markBusy() {
-        showState("Uploading…", "notice");
-        form.setAttribute("aria-busy", "true");
-        window.setTimeout(function () {
-          input.disabled = true;
-        }, 0);
-      }
 
       function submitChosen() {
-        if (sending) return;
-        var file = input.files && input.files[0];
-        if (!file) {
-          showState("Choose a PDF to upload.", "error");
-          return;
-        }
-        showFilename(file);
+        if (form.dataset.sending === "1") return;
+        if (!input.files || !input.files[0]) return;
         form.requestSubmit();
       }
 
       input.addEventListener("change", submitChosen);
 
-      form.addEventListener("submit", function () {
-        var file = input.files && input.files[0];
-        if (file) showFilename(file);
-        sending = true;
-        markBusy();
-      });
-
       form.addEventListener("dragenter", function (event) {
         event.preventDefault();
-        if (!sending) form.classList.add("dragover");
+        if (form.dataset.sending !== "1") form.classList.add("dragover");
       });
       form.addEventListener("dragover", function (event) {
         event.preventDefault();
-        if (!sending) form.classList.add("dragover");
+        if (form.dataset.sending !== "1") form.classList.add("dragover");
       });
       form.addEventListener("dragleave", function () {
         form.classList.remove("dragover");
@@ -92,13 +59,10 @@
       form.addEventListener("drop", function (event) {
         event.preventDefault();
         form.classList.remove("dragover");
-        if (sending) return;
+        if (form.dataset.sending === "1") return;
         var files = event.dataTransfer && event.dataTransfer.files;
         var file = files && files[0];
-        if (!file) {
-          showState("Choose a PDF to upload.", "error");
-          return;
-        }
+        if (!file) return;
         var transfer = new DataTransfer();
         transfer.items.add(file);
         input.files = transfer.files;
@@ -107,6 +71,7 @@
     })();
   </script>
 
+  <div id="catalog-panel">
   <h2>Catalog</h2>
   {% if documents %}
   <table>
@@ -160,7 +125,9 @@
   {% else %}
   <p>No documents yet.</p>
   {% endif %}
+  </div>
 
+  <div id="audit-panel">
   <h2>Audit</h2>
   {% if audit %}
   <table>
@@ -181,4 +148,5 @@
   {% else %}
   <p>No admin actions yet.</p>
   {% endif %}
+  </div>
 {% endblock %}
