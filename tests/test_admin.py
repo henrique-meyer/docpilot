@@ -166,8 +166,14 @@ def test_upload_replace_and_delete(tmp_path: Path) -> None:
     store = MemoryDocumentStore()
     client = _app(tmp_path, store)
     csrf = _sign_in(client)
-    assert 'name="title"' not in client.get("/admin").text
-    assert 'name="year"' not in client.get("/admin").text
+    documents = client.get("/admin")
+    assert 'name="title"' not in documents.text
+    assert 'name="year"' not in documents.text
+    assert "Add by URL" not in documents.text
+    assert 'name="url"' not in documents.text
+    assert ">Add URL</button>" not in documents.text
+    assert 'action="/admin/api/documents/url"' not in documents.text
+    assert "Upload a PDF" in documents.text
 
     missing = client.post(
         "/admin/api/documents",

@@ -24,15 +24,6 @@
     <button type="submit">Upload</button>
   </form>
 
-  <h2>Add by URL</h2>
-  <form method="post" action="/admin/api/documents/url">
-    <input type="hidden" name="csrf" value="{{ csrf }}">
-    <label>PDF URL
-      <input type="url" name="url" required placeholder="https://example.gov/guide.pdf">
-    </label>
-    <button type="submit">Add URL</button>
-  </form>
-
   <h2>Catalog</h2>
   {% if documents %}
   <table>

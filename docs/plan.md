@@ -259,6 +259,12 @@ Found Thursday 15 October 2026.
 
 Export `assets/logo.png` from `assets/logo.svg` and `assets/logo-mark.png` from `assets/logo-mark.svg`. Render the existing SVG files. Do not redraw the mark. The tile keeps the navy square. The mark stays on a transparent background.
 
+### DOCPILOT-27 — Remove the Add by URL form
+
+Found Thursday 15 October 2026.
+
+The admin documents page does not show the Add by URL form: the heading, the URL field, and the Add URL button. `POST /admin/api/documents/url` stays so a client can still add a PDF by URL. `download_pdf` and the route stay.
+
 ### DOCPILOT-29 — Add an Admin menu to the header
 
 Found Thursday 15 October 2026.
@@ -307,6 +313,7 @@ The admin header says DocPilot Admin. The login page heading is Login. The line 
 | DOCPILOT-24 | Use gpt-6.1-sol for chat and the judge | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-24 |
 | DOCPILOT-25 | Keep admin messages out of the address bar | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-25 |
 | DOCPILOT-26 | Export PNG copies of the logo | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-26 |
+| DOCPILOT-27 | Remove the Add by URL form | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-27 |
 | DOCPILOT-29 | Add an Admin menu to the header | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-29 |
 | DOCPILOT-30 | Add Cancel to the change-password page | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-30 |
 | DOCPILOT-31 | Name the admin header and simplify the login page | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-31 |
