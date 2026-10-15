@@ -1,5 +1,5 @@
 # docpilot
-AI document assistant in **Python**: Retrieval-Augmented Generation (RAG) Q&A with citations and a tool-using agent built on **Microsoft Agent Framework** (the successor to Semantic Kernel), **Azure OpenAI**, and **Azure AI Search**. It ships with an evaluation harness, Docker, and CI/CD, and deploys to **Azure Container Apps**.
+AI document assistant in **Python**: Retrieval-Augmented Generation (RAG) Q&A with citations and a tool-using agent built on **Microsoft Agent Framework** (the successor to Semantic Kernel), **Microsoft Foundry**, and **Azure AI Search**. It ships with an evaluation harness, Docker, and CI/CD, and deploys to **Azure Container Apps**.
 
 Live demo: deployed from `main`. The hostname is configured outside this repo.
 
@@ -27,18 +27,18 @@ DocPilot was built with an **AI-native development workflow**: AI agents do much
 **The human in the loop.** I acted as architect, product owner, and reviewer. I set the scope and constraints (cost ceiling, security, public-only data, a document-agnostic design), made the key technical calls (Python, Agent Framework over Semantic Kernel, Container Apps, a simple admin instead of a fixed corpus), caught gaps (an overly technical demo corpus, conflicting docs), approved every cloud change, and reviewed and merged every PR. The AI moves fast; the engineer decides what is right, safe, and worth shipping.
 
 ## Tech stack
-Python 3.12 · FastAPI · Microsoft Agent Framework · Azure OpenAI · Azure AI Search · LangChain (baseline) · OpenTelemetry · Docker · Azure Container Apps · Azure Key Vault · GitHub Actions · Jira · Cursor · Grok Bot
+Python 3.12 · FastAPI · Microsoft Agent Framework · Microsoft Foundry · Azure AI Search · LangChain (baseline) · OpenTelemetry · Docker · Azure Container Apps · Azure Key Vault · GitHub Actions · Jira · Cursor · Grok Bot
 
 ## Azure resources
 One resource group, in East US 2. The group name, subscription, and any custom domain stay out of this repo.
 
-- Azure OpenAI, with a chat deployment (`gpt-4.1-mini`) and an embeddings deployment (`text-embedding-3-small` at 512 dimensions)
+- Microsoft Foundry account `ais-docpilot-prod` and project `docpilot-prod`, with a chat deployment (`gpt-4.1-mini`) and an embeddings deployment (`text-embedding-3-small` at 512 dimensions)
 - Azure AI Search on the Free tier, in East US, because East US 2 had no free-tier capacity
 - A storage account with shared keys disabled, and one private blob container for source PDFs
 - Key Vault, for the admin password hash and the session secret
 - Log Analytics and Application Insights
 - A Container Apps environment and one Container App on the Consumption plan, scaled to zero
-- A system-assigned managed identity, with data roles on OpenAI, Search, Key Vault, and Blob Storage
+- A system-assigned managed identity, with data roles on Foundry, Search, Key Vault, and Blob Storage
 - A $10 budget alert on the resource group
 
 Container images are published to GitHub Container Registry. There is no Azure Container Registry.

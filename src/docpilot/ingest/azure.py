@@ -1,4 +1,4 @@
-"""Azure OpenAI embeddings and Azure AI Search upserts.
+"""Foundry embeddings and Azure AI Search upserts.
 
 The container app uses its managed identity. Tests never construct this module's clients.
 """

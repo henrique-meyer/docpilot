@@ -101,7 +101,7 @@ Blocked by DOCPILOT-3. Live upload is also blocked by DOCPILOT-5.
 
 Due Thursday 15 October 2026.
 
-Bicep for Azure AI Search Free, Azure OpenAI, Key Vault, Blob Storage for source PDFs, Container Apps Consumption, a $10 budget alert, and the GitHub OIDC app, in the DocPilot resource group, East US 2. Key Vault has a slot for the admin password hash. The hash value is not in git or in the template. Blob Storage is account `stdocpilotprod`, container `sources`, with Storage Blob Data Contributor on the Container App identity. Subscription, domain, and alert email stay in the gitignored parameter file.
+Bicep for Azure AI Search Free, Microsoft Foundry (`ais-docpilot-prod`, project `docpilot-prod`), Key Vault, Blob Storage for source PDFs, Container Apps Consumption, a $10 budget alert, and the GitHub OIDC app, in the DocPilot resource group, East US 2. Key Vault has a slot for the admin password hash. The hash value is not in git or in the template. Blob Storage is account `stdocpilotprod`, container `sources`, with Storage Blob Data Contributor on the Container App identity. Subscription, domain, and alert email stay in the gitignored parameter file.
 
 Blocks the live index use inside DOCPILOT-4, and blocks DOCPILOT-13.
 

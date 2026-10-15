@@ -22,7 +22,7 @@ flowchart LR
   agent --> tools[search_documents get_section compare_documents]
   tools --> rag
   rag --> search[Azure AI Search Free]
-  rag --> aoai[Azure OpenAI East US 2]
+  rag --> foundry[Microsoft Foundry East US 2]
   agent --> aoai
   ingest --> blob[Blob or Azurite]
   ingest --> search
@@ -96,7 +96,7 @@ Tests cover anonymous access (401 or 403), delete, and replace.
 
 ## Agent
 
-Package: `agent-framework-core` (Azure OpenAI support is included). Import: `agent_framework`. Confirm the current tool-calling API against the [Python package docs](https://github.com/microsoft/agent-framework/blob/main/python/README.md) before writing the agent. Do not install the entire `agent-framework` meta-package unless a missing integration requires it.
+Package: `agent-framework-core`. Chat goes through `agent-framework-openai` to the Foundry account. Import: `agent_framework`. Confirm the current tool-calling API against the [Python package docs](https://github.com/microsoft/agent-framework/blob/main/python/README.md) before writing the agent. Do not install the entire `agent-framework` meta-package unless a missing integration requires it.
 
 `POST /agent` returns the answer, citations, and each tool call (name, arguments, short result).
 
@@ -144,11 +144,11 @@ Sign-in from GitHub to Azure uses OIDC federated credentials. No cloud keys are 
 
 Resource group: chosen at deploy time, East US 2. The name is kept in the gitignored parameter file. Do not reuse an existing App Service plan.
 
-Infrastructure is Bicep under `infra/`. The estate is Azure-only, and `az deployment group what-if` does not need a remote state account or the cost of a Terraform backend. Names look like `srch-docpilot-prod`, `kv-docpilot-prod`, `ca-docpilot-prod`. The storage account is `stdocpilotprod` because a storage account name cannot contain hyphens. The container is `sources`.
+Infrastructure is Bicep under `infra/`. The estate is Azure-only, and `az deployment group what-if` does not need a remote state account or the cost of a Terraform backend. Names look like `ais-docpilot-prod`, `srch-docpilot-prod`, `kv-docpilot-prod`, `ca-docpilot-prod`. The Foundry project is `docpilot-prod`. The storage account is `stdocpilotprod` because a storage account name cannot contain hyphens. The container is `sources`.
 
 One Azure environment, `prod`, on the custom domain supplied at deploy time. Local Compose is dev. A second Azure environment and a dev subdomain wait until they are worth the extra surface. The Container App uses the Consumption plan and scales to zero replicas.
 
-The app uses a managed identity for Azure OpenAI, Blob Storage (`Storage Blob Data Contributor`), and, if the Free tier allows the data-plane role, Azure AI Search. Anything that cannot be a role assignment goes in Key Vault, including the admin password hash. The Bicep template declares the secret slot. The hash value is set outside git. If Free-tier Search rejects a data-plane role, the query key is stored in Key Vault and the exception is an ADR. Keys never go in git.
+The app uses a managed identity for Microsoft Foundry, Blob Storage (`Storage Blob Data Contributor`), and, if the Free tier allows the data-plane role, Azure AI Search. Anything that cannot be a role assignment goes in Key Vault, including the admin password hash. The Bicep template declares the secret slot. The hash value is set outside git. If Free-tier Search rejects a data-plane role, the query key is stored in Key Vault and the exception is an ADR. Keys never go in git.
 
 Custom domain: free managed certificate, HTTPS only. The deploy step prints two DNS records and stops:
 
@@ -182,7 +182,7 @@ Chat and the LLM judge both use `gpt-4.1-mini` so there is only one chat deploym
 
 ### Cost
 
-Prices below are published list rates, not an invoice. Confirm them on the [Azure OpenAI pricing page](https://azure.microsoft.com/en-us/pricing/details/azure-openai/) before apply. Third-party snapshots in October 2026 put Global Standard `gpt-4.1-mini` near $0.40 per 1M input tokens and $1.60 per 1M output tokens, and Data Zone Standard near $0.44 and $1.76. `text-embedding-3-small` is about $0.022 per 1M tokens.
+Prices below are published list rates, not an invoice. Confirm them on the [Foundry model pricing page](https://azure.microsoft.com/en-us/pricing/details/azure-openai/) before apply. Third-party snapshots in October 2026 put Global Standard `gpt-4.1-mini` near $0.40 per 1M input tokens and $1.60 per 1M output tokens, and Data Zone Standard near $0.44 and $1.76. `text-embedding-3-small` is about $0.022 per 1M tokens.
 
 | Item | Expectation |
 | --- | --- |
