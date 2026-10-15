@@ -174,6 +174,10 @@ def test_upload_replace_and_delete(tmp_path: Path) -> None:
     assert ">Add URL</button>" not in documents.text
     assert 'action="/admin/api/documents/url"' not in documents.text
     assert "Upload a PDF" in documents.text
+    assert 'type="file"' in documents.text
+    assert 'name="file"' in documents.text
+    assert 'class="dropzone"' in documents.text
+    assert ">Upload</button>" not in documents.text
 
     missing = client.post(
         "/admin/api/documents",

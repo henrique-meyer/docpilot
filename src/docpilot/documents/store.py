@@ -5,6 +5,7 @@ Otherwise files live under the local data directory.
 """
 
 import json
+import time
 from pathlib import Path
 from typing import Protocol
 
@@ -91,8 +92,7 @@ class FileDocumentStore:
         self._path("pdfs", f"{document_id}.pdf").unlink(missing_ok=True)
 
     def put_record(self, record: DocumentRecord) -> None:
-        path = self._path("catalog", f"{record.id}.json")
-        path.write_text(json.dumps(record.to_json()), encoding="utf-8")
+        self._write_json(self._path("catalog", f"{record.id}.json"), record.to_json())
 
     def get_record(self, document_id: str) -> DocumentRecord | None:
         path = self.root / "catalog" / f"{document_id}.json"
@@ -110,8 +110,7 @@ class FileDocumentStore:
         return records
 
     def put_audit(self, event: AuditEvent) -> None:
-        path = self._path("audit", f"{event.id}.json")
-        path.write_text(json.dumps(event.to_json()), encoding="utf-8")
+        self._write_json(self._path("audit", f"{event.id}.json"), event.to_json())
 
     def list_audit(self) -> list[AuditEvent]:
         events: list[AuditEvent] = []
@@ -127,6 +126,20 @@ class FileDocumentStore:
             for path in directory.iterdir():
                 if path.is_file():
                     path.unlink()
+
+    def _write_json(self, path: Path, payload: object) -> None:
+        temporary = path.with_name(f"{path.name}.tmp")
+        temporary.write_text(json.dumps(payload), encoding="utf-8")
+        delay = 0.01
+        for attempt in range(8):
+            try:
+                temporary.replace(path)
+                return
+            except PermissionError:
+                if attempt == 7:
+                    raise
+                time.sleep(delay)
+                delay = min(delay * 2, 0.2)
 
     def _path(self, folder: str, name: str) -> Path:
         directory = self.root / folder

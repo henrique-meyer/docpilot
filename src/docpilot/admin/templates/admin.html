@@ -1,6 +1,14 @@
 {% extends "base.html" %}
 {% block title %}Documents · DocPilot admin{% endblock %}
-{% block extra_head %}{% if processing %}<meta http-equiv="refresh" content="2">{% endif %}{% endblock %}
+{% block extra_head %}
+{% if processing %}<meta http-equiv="refresh" content="2">{% endif %}
+<style>
+  .dropzone { border-style: dashed; }
+  .dropzone.dragover { outline: 2px solid var(--accent); background: #f3faf6; }
+  .dropzone[aria-busy="true"] { opacity: 0.72; }
+  #upload-filename { margin: 0; color: var(--ink); }
+</style>
+{% endblock %}
 {% block body %}
   <h1>Documents</h1>
   <p>A PDF is saved to storage and added to the catalog only after that upload is confirmed. Chunking and indexing run after that. The bar uses extracted text size against the 50 MB Free-tier limit.</p>
@@ -16,13 +24,88 @@
   </div>
 
   <h2>Upload a PDF</h2>
-  <form method="post" action="/admin/api/documents" enctype="multipart/form-data">
+  <form id="upload-form" class="dropzone" method="post" action="/admin/api/documents" enctype="multipart/form-data">
     <input type="hidden" name="csrf" value="{{ csrf }}">
     <label>PDF
-      <input type="file" name="file" accept="application/pdf,.pdf" required>
+      <input id="upload-file" type="file" name="file" accept="application/pdf,.pdf" required>
     </label>
-    <button type="submit">Upload</button>
+    <p id="upload-filename">Choose a PDF or drop it here.</p>
+    <p id="upload-state" role="status" hidden></p>
   </form>
+  <script>
+    (function () {
+      var form = document.getElementById("upload-form");
+      var input = document.getElementById("upload-file");
+      var filename = document.getElementById("upload-filename");
+      var state = document.getElementById("upload-state");
+      var sending = false;
+
+      function showFilename(file) {
+        filename.textContent = file.name;
+      }
+
+      function showState(message, kind) {
+        state.hidden = false;
+        state.className = "banner " + kind;
+        state.textContent = message;
+      }
+
+      function markBusy() {
+        showState("Uploading…", "notice");
+        form.setAttribute("aria-busy", "true");
+        window.setTimeout(function () {
+          input.disabled = true;
+        }, 0);
+      }
+
+      function submitChosen() {
+        if (sending) return;
+        var file = input.files && input.files[0];
+        if (!file) {
+          showState("Choose a PDF to upload.", "error");
+          return;
+        }
+        showFilename(file);
+        form.requestSubmit();
+      }
+
+      input.addEventListener("change", submitChosen);
+
+      form.addEventListener("submit", function () {
+        var file = input.files && input.files[0];
+        if (file) showFilename(file);
+        sending = true;
+        markBusy();
+      });
+
+      form.addEventListener("dragenter", function (event) {
+        event.preventDefault();
+        if (!sending) form.classList.add("dragover");
+      });
+      form.addEventListener("dragover", function (event) {
+        event.preventDefault();
+        if (!sending) form.classList.add("dragover");
+      });
+      form.addEventListener("dragleave", function () {
+        form.classList.remove("dragover");
+      });
+      form.addEventListener("drop", function (event) {
+        event.preventDefault();
+        form.classList.remove("dragover");
+        if (sending) return;
+        var files = event.dataTransfer && event.dataTransfer.files;
+        var file = files && files[0];
+        if (!file) {
+          showState("Choose a PDF to upload.", "error");
+          return;
+        }
+        var transfer = new DataTransfer();
+        transfer.items.add(file);
+        input.files = transfer.files;
+        submitChosen();
+      });
+    })();
+  </script>
 
   <h2>Catalog</h2>
   {% if documents %}
