@@ -251,7 +251,7 @@ Chat and the LLM judge use one Foundry deployment, `gpt-6.1-sol` version `2026-0
 
 Found Thursday 15 October 2026.
 
-Admin success and error messages are not query parameters. A redirect carries the message in a short-lived HttpOnly cookie, the next page shows it once, and the address bar stays `/admin` or `/admin/login`. A refresh shows nothing. The status poll keeps the cookie only while a document is still queued or processing. JSON clients still get the JSON body.
+Admin success and error messages are not query parameters. A redirect carries the message in a short-lived HttpOnly cookie, the next page shows it once, and the address bar stays `/admin` or `/admin/login`. A refresh shows nothing. [DOCPILOT-33](https://nitro.atlassian.net/browse/DOCPILOT-33) clears that message after a few seconds and does not keep it on screen while a document is still queued or processing. JSON clients still get the JSON body.
 
 ### DOCPILOT-26 — Export PNG copies of the logo
 
@@ -295,6 +295,14 @@ Found Thursday 15 October 2026.
 
 File upload and add-by-URL share one processing path. During that request, after the PDF is stored, the text is extracted and compared with the index limit. If the document would pass the limit, the stored PDF and its catalog record are deleted and the browser gets an error. Embeddings and the search upsert do not run. A later indexing failure still keeps the stored PDF.
 
+### DOCPILOT-33 — Show upload progress and clear page messages
+
+Found Thursday 15 October 2026.
+
+Every admin form submits with an async request. The browser does not post a form as a page navigation. Upload, replace, delete, reset, password change, sign-in, setup, and sign-out stay on the current page until the response arrives. A success that opens another admin page loads that page with a GET. A failure, including a connection reset, shows the error on the current page.
+
+The drop zone says Uploading only while the file is being sent, and a progress bar advances during that send so the control does not look frozen. Once the file has been sent, the bar keeps moving and the message changes to show that the file was received and work is still running, until the response arrives. A success clears the drop zone. The catalog, usage meter, and audit log update in place, including while a document is queued or processing. Notices and errors on the page disappear after a few seconds. The documents page does not reload itself to keep a notice on screen.
+
 ## Issue index
 
 | Key | Summary | Due | URL |
@@ -331,3 +339,4 @@ File upload and add-by-URL share one processing path. During that request, after
 | DOCPILOT-30 | Add Cancel to the change-password page | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-30 |
 | DOCPILOT-31 | Name the admin header and simplify the login page | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-31 |
 | DOCPILOT-32 | Reject an upload that would pass the index limit | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-32 |
+| DOCPILOT-33 | Show upload progress and clear page messages | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-33 |

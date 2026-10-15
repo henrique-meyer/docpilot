@@ -138,6 +138,15 @@
     .status-queued, .status-processing { background: #fff4d6; }
     .meter { height: 10px; background: #efeae3; border-radius: 999px; overflow: hidden; }
     .meter span { display: block; height: 100%; background: var(--accent); }
+    .upload-meter { margin-top: 8px; }
+    .upload-meter.working span {
+      width: 40%;
+      animation: upload-working 1.1s ease-in-out infinite;
+    }
+    @keyframes upload-working {
+      0% { transform: translateX(-130%); }
+      100% { transform: translateX(280%); }
+    }
     .actions form { padding: 0; border: 0; background: transparent; margin-bottom: 8px; }
     .top { display: flex; justify-content: space-between; gap: 16px; align-items: start; }
     .top form { padding: 0; border: 0; background: transparent; }
@@ -165,5 +174,269 @@
   <main>
     {% block body %}{% endblock %}
   </main>
+  <script>
+    (function () {
+      var DISMISS_MS = 5000;
+      var BANNER_KEY = "docpilot-banner";
+      var CONNECTION_ERROR = "The connection closed before the server answered.";
+      var bannerTimer = 0;
+      var pollTimer = 0;
+
+      function pageBanner() {
+        return document.getElementById("page-banner");
+      }
+
+      function showBanner(kind, message, until) {
+        var el = pageBanner();
+        if (!el) return;
+        el.hidden = false;
+        el.className = "banner " + (kind === "error" ? "error" : "notice");
+        el.setAttribute("data-autodismiss", "");
+        el.textContent = message;
+        var delay = typeof until === "number" ? Math.max(0, until - Date.now()) : DISMISS_MS;
+        window.clearTimeout(bannerTimer);
+        bannerTimer = window.setTimeout(function () {
+          el.hidden = true;
+          el.textContent = "";
+        }, delay);
+      }
+
+      function rememberBanner(kind, message) {
+        try {
+          sessionStorage.setItem(BANNER_KEY, JSON.stringify({
+            kind: kind,
+            message: message,
+            until: Date.now() + DISMISS_MS
+          }));
+        } catch (error) {
+          return;
+        }
+      }
+
+      function takeSavedBanner() {
+        var raw = "";
+        try {
+          raw = sessionStorage.getItem(BANNER_KEY) || "";
+          sessionStorage.removeItem(BANNER_KEY);
+        } catch (error) {
+          return null;
+        }
+        if (!raw) return null;
+        try {
+          var saved = JSON.parse(raw);
+        } catch (error) {
+          return null;
+        }
+        if (!saved || !saved.message || saved.until <= Date.now()) return null;
+        return saved;
+      }
+
+      function restoreBanner() {
+        var saved = takeSavedBanner();
+        if (saved) {
+          showBanner(saved.kind, saved.message, saved.until);
+          return;
+        }
+        var el = pageBanner();
+        if (!el || el.hidden) return;
+        var text = (el.textContent || "").trim();
+        if (!text) return;
+        showBanner(el.classList.contains("error") ? "error" : "notice", text);
+      }
+
+      function go(url, kind, message) {
+        if (message) rememberBanner(kind || "notice", message);
+        window.location.assign(url);
+      }
+
+      function parseJson(text) {
+        try {
+          return JSON.parse(text);
+        } catch (error) {
+          return {};
+        }
+      }
+
+      function resetUpload(form) {
+        form.dataset.sending = "";
+        form.removeAttribute("aria-busy");
+        var input = document.getElementById("upload-file");
+        if (input) {
+          input.disabled = false;
+          input.value = "";
+        }
+        var filename = document.getElementById("upload-filename");
+        if (filename) filename.textContent = "Choose a PDF or drop it here.";
+        var state = document.getElementById("upload-state");
+        if (state) {
+          state.hidden = true;
+          state.textContent = "";
+        }
+        var progress = document.getElementById("upload-progress");
+        if (progress) {
+          progress.hidden = true;
+          progress.classList.remove("working");
+        }
+        var bar = document.getElementById("upload-progress-bar");
+        if (bar) bar.style.width = "";
+      }
+
+      function showUploading(form) {
+        var state = document.getElementById("upload-state");
+        var progress = document.getElementById("upload-progress");
+        var bar = document.getElementById("upload-progress-bar");
+        var filename = document.getElementById("upload-filename");
+        var input = document.getElementById("upload-file");
+        var file = input && input.files && input.files[0];
+        if (filename && file) filename.textContent = file.name;
+        if (state) {
+          state.hidden = false;
+          state.className = "banner notice";
+          state.textContent = "Uploading…";
+        }
+        if (progress && bar) {
+          progress.hidden = false;
+          progress.classList.add("working");
+          bar.style.width = "";
+          progress.removeAttribute("aria-valuenow");
+        }
+        form.setAttribute("aria-busy", "true");
+      }
+
+      function showReceived() {
+        var state = document.getElementById("upload-state");
+        var progress = document.getElementById("upload-progress");
+        var bar = document.getElementById("upload-progress-bar");
+        if (state) state.textContent = "File received. Still working…";
+        if (progress && bar) {
+          progress.classList.add("working");
+          bar.style.width = "";
+          progress.removeAttribute("aria-valuenow");
+        }
+      }
+
+      function showProgress(loaded, total) {
+        var progress = document.getElementById("upload-progress");
+        var bar = document.getElementById("upload-progress-bar");
+        if (!progress || !bar || !total) return;
+        var percent = Math.min(100, Math.round((loaded / total) * 100));
+        progress.classList.remove("working");
+        bar.style.width = percent + "%";
+        progress.setAttribute("aria-valuenow", String(percent));
+      }
+
+      function refreshDocuments() {
+        if (!document.getElementById("catalog-panel")) return Promise.resolve();
+        return fetch("/admin", {
+          headers: { "Accept": "text/html" },
+          credentials: "same-origin"
+        }).then(function (response) {
+          return response.text();
+        }).then(function (html) {
+          var parsed = new DOMParser().parseFromString(html, "text/html");
+          ["usage-panel", "catalog-panel", "audit-panel"].forEach(function (id) {
+            var next = parsed.getElementById(id);
+            var current = document.getElementById(id);
+            if (next && current) current.replaceWith(next);
+          });
+          schedulePoll();
+        }).catch(function () {
+          schedulePoll();
+        });
+      }
+
+      function schedulePoll() {
+        window.clearTimeout(pollTimer);
+        if (!document.querySelector("#catalog-panel .status-queued, #catalog-panel .status-processing")) return;
+        pollTimer = window.setTimeout(refreshDocuments, 2000);
+      }
+
+      function handleResponse(form, status, payload) {
+        form.dataset.sending = "";
+        if (!status) {
+          if (form.id === "upload-form") resetUpload(form);
+          showBanner("error", CONNECTION_ERROR);
+          return;
+        }
+        var message = payload.message || "";
+        if (status < 200 || status >= 300) {
+          if (form.id === "upload-form") resetUpload(form);
+          showBanner("error", message || "The request failed.");
+          return;
+        }
+        if (payload.next) {
+          go(payload.next, "notice", message);
+          return;
+        }
+        if (form.id === "upload-form") resetUpload(form);
+        if (message) showBanner("notice", message);
+        if (document.getElementById("catalog-panel")) refreshDocuments();
+      }
+
+      function sendForm(form, submitter) {
+        var body = submitter ? new FormData(form, submitter) : new FormData(form);
+        fetch(form.action, {
+          method: "POST",
+          body: body,
+          headers: { "Accept": "application/json" },
+          credentials: "same-origin"
+        }).then(function (response) {
+          return response.text().then(function (text) {
+            handleResponse(form, response.status, parseJson(text));
+          });
+        }).catch(function () {
+          form.dataset.sending = "";
+          showBanner("error", CONNECTION_ERROR);
+        });
+      }
+
+      function sendUpload(form) {
+        var input = document.getElementById("upload-file");
+        var file = input && input.files && input.files[0];
+        if (!file) {
+          form.dataset.sending = "";
+          showBanner("error", "Choose a PDF to upload.");
+          return;
+        }
+        showUploading(form);
+        var body = new FormData();
+        var csrf = form.querySelector('input[name="csrf"]');
+        body.append("csrf", csrf ? csrf.value : "");
+        body.append("file", file, file.name);
+        window.setTimeout(function () {
+          input.disabled = true;
+        }, 0);
+        var xhr = new XMLHttpRequest();
+        xhr.open("POST", form.action);
+        xhr.setRequestHeader("Accept", "application/json");
+        xhr.upload.addEventListener("progress", function (event) {
+          if (event.lengthComputable) showProgress(event.loaded, event.total);
+        });
+        xhr.upload.addEventListener("load", showReceived);
+        xhr.addEventListener("load", function () {
+          handleResponse(form, xhr.status, parseJson(xhr.responseText || ""));
+        });
+        xhr.addEventListener("error", function () {
+          form.dataset.sending = "";
+          resetUpload(form);
+          showBanner("error", CONNECTION_ERROR);
+        });
+        xhr.send(body);
+      }
+
+      document.addEventListener("submit", function (event) {
+        var form = event.target;
+        if (!form || form.tagName !== "FORM") return;
+        event.preventDefault();
+        if (form.dataset.sending === "1") return;
+        form.dataset.sending = "1";
+        if (form.id === "upload-form") sendUpload(form);
+        else sendForm(form, event.submitter || null);
+      });
+
+      restoreBanner();
+      schedulePoll();
+    })();
+  </script>
 </body>
 </html>

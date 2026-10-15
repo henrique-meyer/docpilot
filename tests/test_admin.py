@@ -266,13 +266,12 @@ def test_admin_messages_stay_out_of_the_address_bar(tmp_path: Path) -> None:
     record.status = "processing"
     polling = client.get("/admin")
     assert "The file is stored" in polling.text
+    assert 'data-autodismiss' in polling.text
     assert polling.url.path == "/admin"
     assert not polling.url.query
     still = client.get("/admin")
-    assert "The file is stored" in still.text
+    assert "The file is stored" not in still.text
     record.status = "ready"
-    finished = client.get("/admin")
-    assert "The file is stored" in finished.text
     quiet = client.get("/admin")
     assert "The file is stored" not in quiet.text
 
@@ -331,7 +330,64 @@ def test_admin_messages_stay_out_of_the_address_bar(tmp_path: Path) -> None:
         headers={"Accept": "application/json"},
     )
     assert queued.status_code == 202
+    assert queued.json()["message"] == "The file is stored. Indexing continues until the status is ready."
+    assert "location" not in queued.headers
     assert "docpilot_flash" not in queued.headers.get("set-cookie", "")
+
+
+def test_admin_forms_answer_json_on_the_same_page(tmp_path: Path) -> None:
+    client = _app(tmp_path)
+    login = client.get("/admin/login")
+    assert 'id="page-banner"' in login.text
+    assert "preventDefault" in login.text
+    bad = client.post(
+        "/admin/login",
+        data={"password": "nope", "csrf": _csrf(login.text)},
+        headers={"Accept": "application/json"},
+    )
+    assert bad.status_code == 401
+    assert bad.json()["message"] == "The password is wrong."
+    assert "location" not in bad.headers
+
+    csrf = _sign_in(client)
+    documents = client.get("/admin")
+    assert 'id="upload-progress"' in documents.text
+    assert "File received. Still working" in documents.text
+    assert "XMLHttpRequest" in documents.text
+    assert 'http-equiv="refresh"' not in documents.text
+    assert 'id="catalog-panel"' in documents.text
+    uploaded = client.post(
+        "/admin/api/documents",
+        data={"csrf": csrf},
+        files={"file": ("guide.pdf", _pdf(title="Async guide"), "application/pdf")},
+        headers={"Accept": "application/json"},
+    )
+    assert uploaded.status_code == 202
+    document_id = uploaded.json()["id"]
+    deleted = client.post(
+        f"/admin/api/documents/{document_id}/delete",
+        data={"csrf": csrf},
+        headers={"Accept": "application/json"},
+    )
+    assert deleted.status_code == 200
+    assert deleted.json()["message"] == "Document deleted."
+    assert "location" not in deleted.headers
+    short = client.post(
+        "/admin/password",
+        data={"csrf": csrf, "password": "short", "confirm": "short"},
+        headers={"Accept": "application/json"},
+    )
+    assert short.status_code == 400
+    assert short.json()["message"] == "Use at least 8 characters."
+    signed_out = client.post(
+        "/admin/logout",
+        data={"csrf": csrf},
+        headers={"Accept": "application/json"},
+    )
+    assert signed_out.status_code == 200
+    assert signed_out.json()["next"] == "/admin/login"
+    assert signed_out.json()["message"] == "Signed out."
+    assert client.get("/admin", follow_redirects=False).status_code == 303
 
 
 def test_password_change_rejects_a_short_password_and_a_mismatch(tmp_path: Path) -> None:
