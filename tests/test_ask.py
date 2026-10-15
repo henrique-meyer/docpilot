@@ -139,7 +139,33 @@ def test_home_page_states_the_disclaimer(tmp_path: Path) -> None:
     assert page.status_code == 200
     assert "informational only" in page.text
     assert 'href="/assets/logo.svg"' in page.text
+    assert 'class="catalog-summary"' not in page.text
     assert client.get("/health").json() == {"status": "ok"}
+
+
+def test_home_page_shows_the_catalog_summary_above_the_ask_box(tmp_path: Path) -> None:
+    client = _client(tmp_path, Asker(None, None))
+    client.app.state.documents.save_summary(
+        "IRS Publications for use in preparing 2025 returns",
+        "These documents provide guidance for filing 2025 personal tax returns.",
+        ("Do dead people have to file taxes?", "", "What if my wife doesn't live in the US?"),
+    )
+    page = client.get("/")
+    assert page.status_code == 200
+    assert page.headers["cache-control"] == "no-store"
+    text = page.text
+    assert text.index('class="catalog-summary"') < text.index('id="question"')
+    assert "<h1>IRS Publications for use in preparing 2025 returns</h1>" in text
+    assert "These documents provide guidance for filing 2025 personal tax returns." in text
+    assert "<li>Do dead people have to file taxes?</li>" in text
+    assert "What if my wife doesn" in text
+    assert text.count("<li>") == 2
+
+    client.app.state.documents.save_summary("<script>", "a & b", ("", "", ""))
+    escaped = client.get("/").text
+    assert "<h1>&lt;script&gt;</h1>" in escaped
+    assert "<h1><script>" not in escaped
+    assert "<p>a &amp; b</p>" in escaped
 
 
 class BrokenChat:

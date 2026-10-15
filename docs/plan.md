@@ -355,6 +355,28 @@ Found Thursday 15 October 2026.
 
 When a PDF is stored and its catalog row exists, write an audit event for the upload. Indexing has not finished yet. When indexing finishes, write a separate audit event: processed when the status becomes ready, or failed when it becomes failed. The upload line stays. A file that is still processing, or that never finishes, still has its upload line.
 
+### DOCPILOT-40 — Join words split by PDF line breaks
+
+Found Thursday 15 October 2026.
+
+Citation snippets show words split by a space. The PDF breaks a word at the end of a line, and extraction keeps that break.
+
+A hyphen at the end of a line stays, with the rest of the word after a space: "digi- tal", "legis- lation", "ba- sis", "Instruc- tions", "rec- reation", "pro- vided". Those read as "digital", "legislation", "basis", "Instructions", "recreation", "provided".
+
+Words that start with T or Y are split after that letter: "T ax", "T axpayers", "Y ou". Those read as "Tax", "Taxpayers", "You". A space before a hyphen, as in "non -itemizers", is removed so it reads "non-itemizers".
+
+A hyphen that is part of the text stays, including "7-year" and "non-taxable". A single capital that is its own word stays, including "A flat fee", "I am", "S corporation", and "Section B". Spaces between words stay.
+
+Do this when the PDF text is extracted, before chunking, so a new upload or seed stores the joined words. Apply the same cleanup to a citation snippet when it is returned, so a document already in the index reads correctly without a new ingest. Do not re-embed the live index.
+
+### DOCPILOT-41 — Show the catalog summary above the ask box
+
+Found Thursday 15 October 2026.
+
+The public homepage shows the saved catalog summary at the top of the ask box. The title, the summary, and the sample questions appear above the question field. A blank field is left out. When the title, the summary, and all three questions are blank, the block is not shown.
+
+A visitor can read this block without signing in. They cannot change it. The admin save and draft routes stay signed-in only. Changing the saved summary changes what the homepage shows on the next visit.
+
 ## Issue index
 
 | Key | Summary | Due | URL |
@@ -398,3 +420,5 @@ When a PDF is stored and its catalog row exists, write an audit event for the up
 | DOCPILOT-37 | Add a Catalog Summary on the admin documents page | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-37 |
 | DOCPILOT-38 | Compact the catalog table | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-38 |
 | DOCPILOT-39 | Record upload and processing as separate audit events | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-39 |
+| DOCPILOT-40 | Join words split by PDF line breaks | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-40 |
+| DOCPILOT-41 | Show the catalog summary above the ask box | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-41 |
