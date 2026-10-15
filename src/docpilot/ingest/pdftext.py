@@ -7,6 +7,7 @@ from pypdf.errors import PdfReadError
 
 from docpilot.documents.errors import DocumentError
 from docpilot.ingest.chunk import PageText
+from docpilot.ingest.repair import repair_passage
 
 MAX_PAGES = 2000
 
@@ -37,9 +38,11 @@ def read_pages(data: bytes) -> list[PageText]:
 
 def _section_and_body(raw: str, current: str) -> tuple[str, str]:
     lines = [line.strip() for line in raw.splitlines() if line.strip()]
-    if lines and _looks_like_heading(lines[0]):
-        return lines[0][:200], " ".join(lines[1:])
-    return current, " ".join(lines)
+    if not lines:
+        return current, ""
+    if _looks_like_heading(lines[0]):
+        return repair_passage(lines[0])[:200], repair_passage("\n".join(lines[1:]))
+    return current, repair_passage("\n".join(lines))
 
 
 def _looks_like_heading(line: str) -> bool:

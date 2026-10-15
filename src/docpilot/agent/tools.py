@@ -6,6 +6,7 @@ from collections.abc import Callable
 from typing import Annotated
 
 from docpilot.ask.service import PassageSource, _citation
+from docpilot.ingest.repair import repair_passage
 from docpilot.observe import span
 from docpilot.retrieve.context import Hit
 
@@ -123,5 +124,6 @@ def _matches_section(hit: Hit, section: str) -> bool:
 
 def _format(hits: list[Hit]) -> str:
     return "\n\n".join(
-        f"{hit.title} — {hit.section} (p. {hit.page})\n{hit.content}" for hit in hits
+        f"{hit.title} — {hit.section} (p. {hit.page})\n{repair_passage(hit.content)}"
+        for hit in hits
     )
