@@ -239,13 +239,13 @@ Remove Title and Year from the upload, URL, and replace forms. Ingest reads them
 
 Found Thursday 15 October 2026.
 
-Admin pages use the public navy header, the existing `assets/logo.svg` mark, and the DocPilot name.
+Admin pages use the public navy header, the existing `assets/logo.svg` mark, and the DocPilot name. The same file is the favicon.
 
 ### DOCPILOT-24 — Use gpt-6.1-sol for chat and the judge
 
 Found Thursday 15 October 2026.
 
-Chat and the LLM judge use one Foundry deployment, `gpt-6.1-sol` version `2026-09-29`, Data Zone Standard (US), capacity 50. Embeddings stay `text-embedding-3-small` at 512 dimensions. Public `/ask` and `/agent` keep the daily token cap as the spend throttle. The same file is the favicon.
+Chat and the LLM judge use one Foundry deployment, `gpt-6.1-sol` version `2026-09-29`, Data Zone Standard (US), capacity 50. Embeddings stay `text-embedding-3-small` at 512 dimensions. Public `/ask` and `/agent` keep the daily token cap as the spend throttle.
 
 ## Issue index
 
