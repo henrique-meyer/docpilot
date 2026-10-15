@@ -59,6 +59,11 @@
       color: var(--paper);
       cursor: pointer;
     }
+    .catalog-summary { margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+    .catalog-summary h1 { font-size: 1.25rem; line-height: 1.3; margin: 0 0 8px; }
+    .catalog-summary p { margin: 0 0 8px; }
+    .catalog-summary ul { margin: 0; padding-left: 1.2rem; }
+    .catalog-summary li { margin: 4px 0; }
     .disclaimer { color: var(--muted); font-size: 0.92rem; }
     .answer { margin-top: 16px; white-space: pre-wrap; }
     .citation { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
@@ -74,6 +79,18 @@
   </header>
   <main>
     <form id="ask">
+      {% if show_summary %}
+      <div class="catalog-summary">
+        {% if summary.title %}<h1>{{ summary.title }}</h1>{% endif %}
+        {% if summary.summary %}<p>{{ summary.summary }}</p>{% endif %}
+        {% if questions %}
+        <p>Sample questions</p>
+        <ul>
+          {% for question in questions %}<li>{{ question }}</li>{% endfor %}
+        </ul>
+        {% endif %}
+      </div>
+      {% endif %}
       <label for="question">Ask about the uploaded documents</label>
       <textarea id="question" name="question" maxlength="1000" required></textarea>
       <button type="submit">Ask</button>

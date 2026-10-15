@@ -5,14 +5,19 @@ from pathlib import Path
 
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse
+from jinja2 import Environment, FileSystemLoader, select_autoescape
 from pydantic import BaseModel, Field
 
 from docpilot.ask.limits import DemoLimitReached, DemoLimits, QuestionTooLong, RateLimited
 from docpilot.ask.service import DEMO_LIMIT, Asker
+from docpilot.documents.service import DocumentService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
-_PAGE = Path(__file__).resolve().parent / "page.html"
+_TEMPLATES = Environment(
+    loader=FileSystemLoader(Path(__file__).resolve().parent),
+    autoescape=select_autoescape(["html"]),
+)
 
 
 class AskBody(BaseModel):
@@ -38,9 +43,21 @@ def client_ip(request: Request) -> str:
     return request.client.host
 
 
+def _documents(request: Request) -> DocumentService:
+    service: DocumentService = request.app.state.documents
+    return service
+
+
 @router.get("/", response_class=HTMLResponse)
-def home() -> HTMLResponse:
-    return HTMLResponse(_PAGE.read_text(encoding="utf-8"))
+def home(request: Request) -> HTMLResponse:
+    summary = _documents(request).get_summary()
+    questions = [question for question in summary.questions if question]
+    body = _TEMPLATES.get_template("page.html").render(
+        summary=summary,
+        questions=questions,
+        show_summary=bool(summary.title or summary.summary or questions),
+    )
+    return HTMLResponse(body, headers={"Cache-Control": "no-store"})
 
 
 @router.post("/ask")
