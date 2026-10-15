@@ -3,7 +3,7 @@ name = "docpilot"
 version = "0.1.0"
 description = "Document-agnostic RAG and agent assistant."
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.12,<3.15"
 dependencies = [
   "argon2-cffi>=23.1",
   "azure-identity>=1.19",
@@ -17,6 +17,8 @@ dependencies = [
   "pypdf>=5.1",
   "python-multipart>=0.0.12",
   "uvicorn>=0.32",
+  "agent-framework-core>=1.20,<2",
+  "agent-framework-openai>=1.16,<2",
 ]
 
 [dependency-groups]
