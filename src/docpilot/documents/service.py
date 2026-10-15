@@ -8,7 +8,6 @@ new chunks are upserted. The 50 MB cap uses extracted text size.
 import logging
 import threading
 import uuid
-from dataclasses import replace
 from datetime import UTC, datetime
 
 from docpilot.config import Settings
@@ -53,11 +52,7 @@ class DocumentService:
         return total
 
     def source_bytes_used(self) -> int:
-        return sum(
-            record.source_bytes
-            for record in self.store.list_records()
-            if record.status == "ready"
-        )
+        return sum(record.source_bytes for record in self.store.list_records())
 
     def begin_upload(
         self,
@@ -81,13 +76,24 @@ class DocumentService:
             status="queued",
         )
         with self._lock:
-            self.store.put_record(record)
+            self._store_new_pdf(record.id, data)
+            try:
+                self.store.put_record(record)
+            except Exception:
+                self.store.delete_pdf(record.id)
+                raise
         return record
 
     def finish_upload(self, document_id: str, data: bytes) -> None:
         with self._lock:
             record = self.store.get_record(document_id)
             if record is None:
+                return
+            if not self.store.confirm_pdf(document_id, len(data)):
+                record.status = "failed"
+                record.error = MESSAGES["store_failed"]
+                self.store.put_record(record)
+                self._audit("upload_failed", record.id, record.error)
                 return
             record.status = "processing"
             record.error = None
@@ -102,7 +108,6 @@ class DocumentService:
                     source=record.source,
                     year=record.year,
                 )
-                self.store.put_pdf(document_id, data)
                 record.pages = info.pages
                 record.chunk_count = result.chunk_count
                 record.index_bytes = info.index_bytes
@@ -113,16 +118,14 @@ class DocumentService:
                 self.store.put_record(record)
                 self._audit("upload", record.id, record.title)
             except DocumentError as exc:
-                self.store.delete_pdf(document_id)
                 record.status = "failed"
                 record.error = MESSAGES.get(exc.code, MESSAGES["not_pdf"])
                 self.store.put_record(record)
                 self._audit("upload_failed", record.id, record.error)
             except Exception:
                 logger.exception("upload failed for %s", document_id)
-                self.store.delete_pdf(document_id)
                 record.status = "failed"
-                record.error = "Could not store the document."
+                record.error = MESSAGES["index_failed"]
                 self.store.put_record(record)
                 self._audit("upload_failed", record.id, record.error)
 
@@ -153,24 +156,38 @@ class DocumentService:
             current = self.store.get_record(document_id)
             if current is None:
                 return
-            snapshot = replace(current)
+            try:
+                self.store.put_pdf(document_id, data)
+                if not self.store.confirm_pdf(document_id, len(data)):
+                    raise DocumentError("store_failed")
+            except DocumentError as exc:
+                self._audit(
+                    "replace_failed",
+                    document_id,
+                    MESSAGES.get(exc.code, MESSAGES["store_failed"]),
+                )
+                return
+            except Exception:
+                logger.exception("replace failed for %s", document_id)
+                self._audit("replace_failed", document_id, MESSAGES["store_failed"])
+                return
             current.status = "processing"
             current.error = None
+            current.title = _clean(title, fallback=current.title)
+            current.year = _clean_year(year) if year is not None else current.year
+            current.source_bytes = len(data)
             self.store.put_record(current)
             try:
                 info = extract_pdf(data)
                 self._ensure_capacity(info.index_bytes, excluding=document_id)
-                current.title = _clean(title, fallback=snapshot.title)
                 result = self.ingestor.ingest(
                     data,
                     document_id=document_id,
                     title=current.title,
                     source=current.source,
-                    year=_clean_year(year) if year is not None else snapshot.year,
+                    year=current.year,
                 )
-                self.store.put_pdf(document_id, data)
                 current.chunk_count = result.chunk_count
-                current.year = _clean_year(year) if year is not None else snapshot.year
                 current.pages = info.pages
                 current.index_bytes = info.index_bytes
                 current.source_bytes = len(data)
@@ -180,12 +197,23 @@ class DocumentService:
                 self.store.put_record(current)
                 self._audit("replace", current.id, current.title)
             except DocumentError as exc:
-                self.store.put_record(snapshot)
-                self._audit("replace_failed", document_id, MESSAGES.get(exc.code, "Replace failed."))
+                current.status = "failed"
+                current.error = MESSAGES.get(exc.code, "Replace failed.")
+                self.store.put_record(current)
+                self._audit("replace_failed", document_id, current.error)
             except Exception:
                 logger.exception("replace failed for %s", document_id)
-                self.store.put_record(snapshot)
-                self._audit("replace_failed", document_id, "Could not store the document.")
+                current.status = "failed"
+                current.error = MESSAGES["index_failed"]
+                self.store.put_record(current)
+                self._audit("replace_failed", document_id, current.error)
+
+    def _store_new_pdf(self, document_id: str, data: bytes) -> None:
+        self.store.put_pdf(document_id, data)
+        if self.store.confirm_pdf(document_id, len(data)):
+            return
+        self.store.delete_pdf(document_id)
+        raise DocumentError("store_failed")
 
     def validate_upload(self, data: bytes) -> None:
         if not data:

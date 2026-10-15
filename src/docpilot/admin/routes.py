@@ -29,7 +29,7 @@ _TEMPLATES = Environment(
 )
 
 NOTICES = {
-    "upload_queued": "Upload started. The file is stored when its status is ready.",
+    "upload_queued": "The file is stored. Indexing continues until the status is ready.",
     "replace_queued": "Replacement started. The previous file stays until the new one is stored.",
     "deleted": "Document deleted.",
     "logged_out": "Signed out.",
