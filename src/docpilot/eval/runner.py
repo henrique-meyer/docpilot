@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
+from docpilot.ask.service import NOT_FOUND, AskResult
 from docpilot.config import Settings
 from docpilot.eval.cases import GoldenCase, RedTeamCase, load_golden, load_redteam
 from docpilot.eval.score import Judge, citation_score, correctness, red_team_passed
@@ -242,3 +243,51 @@ def _cell(value: float | None) -> str:
 def load_set(root: Path, name: str) -> tuple[list[GoldenCase], list[RedTeamCase]]:
     directory = root / "eval" / name
     return load_golden(directory / "golden.jsonl"), load_redteam(directory / "redteam.jsonl")
+
+
+class _ReferenceAnswers:
+    """Answers taken from the golden file, so CI can gate the set without Azure."""
+
+    def __init__(self, golden: list[GoldenCase], redteam: list[RedTeamCase]) -> None:
+        self._answers = {
+            case.question: AskResult(
+                " ".join(case.facts),
+                [
+                    {
+                        "doc": source.doc,
+                        "section": "",
+                        "page": source.pages[0] if source.pages else 0,
+                        "snippet": case.facts[0] if case.facts else "",
+                    }
+                    for source in case.sources
+                ],
+                "reference",
+                1,
+            )
+            for case in golden
+        }
+        for case in redteam:
+            self._answers[case.question] = AskResult(NOT_FOUND, [], "reference", 1)
+
+    def ask(self, question: str) -> AskResult:
+        return self._answers[question]
+
+
+class _PassingJudge:
+    def score(self, question: str, answer: str, facts: tuple[str, ...]) -> tuple[float, float, int]:
+        del question, answer, facts
+        return 1.0, 1.0, 0
+
+
+def self_check(root: Path, name: str, thresholds: Thresholds) -> EvalReport:
+    golden, redteam = load_set(root, name)
+    if name == "irs" and (len(golden) != 30 or len(redteam) != 10):
+        raise ValueError("the IRS set needs 30 questions and 10 red-team prompts")
+    return evaluate(
+        _ReferenceAnswers(golden, redteam),
+        _PassingJudge(),
+        golden,
+        redteam,
+        thresholds,
+        set_name=name,
+    )

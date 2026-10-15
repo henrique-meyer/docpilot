@@ -3,7 +3,7 @@ from pathlib import Path
 
 from docpilot.ask.service import AskResult
 from docpilot.eval.cases import GoldenCase, RedTeamCase, Source, load_golden, load_redteam
-from docpilot.eval.runner import Thresholds, evaluate, write_report
+from docpilot.eval.runner import Thresholds, evaluate, self_check, write_report
 from docpilot.eval.score import citation_score, fact_score, red_team_passed
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -22,6 +22,14 @@ class PerfectJudge:
     def score(self, question: str, answer: str, facts: tuple[str, ...]) -> tuple[float, float, int]:
         del question, answer, facts
         return 1.0, 1.0, 3
+
+
+def test_irs_self_check_passes_the_configured_thresholds() -> None:
+    report = self_check(ROOT, "irs", PASSING)
+    assert report.passed
+    assert report.correctness == 1
+    assert report.citation_accuracy == 1
+    assert report.red_team_pass_rate == 1
 
 
 def test_irs_set_has_thirty_questions_and_a_multi_document_case() -> None:
