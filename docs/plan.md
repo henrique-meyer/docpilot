@@ -259,6 +259,12 @@ Found Thursday 15 October 2026.
 
 Export `assets/logo.png` from `assets/logo.svg` and `assets/logo-mark.png` from `assets/logo-mark.svg`. Render the existing SVG files. Do not redraw the mark. The tile keeps the navy square. The mark stays on a transparent background.
 
+### DOCPILOT-29 — Add an Admin menu to the header
+
+Found Thursday 15 October 2026.
+
+A signed-in admin header has an Admin menu on the right: Documents, Reset Catalog, Change Password, and Sign Out. Documents opens `/admin`. Sign Out posts the existing logout. The sign-in page has no menu. The documents page no longer has its own Password, Sign out, or Reset catalog controls.
+
 ## Issue index
 
 | Key | Summary | Due | URL |
@@ -289,3 +295,4 @@ Export `assets/logo.png` from `assets/logo.svg` and `assets/logo-mark.png` from 
 | DOCPILOT-24 | Use gpt-6.1-sol for chat and the judge | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-24 |
 | DOCPILOT-25 | Keep admin messages out of the address bar | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-25 |
 | DOCPILOT-26 | Export PNG copies of the logo | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-26 |
+| DOCPILOT-29 | Add an Admin menu to the header | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-29 |

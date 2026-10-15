@@ -101,13 +101,22 @@ def test_admin_pages_use_the_public_header(tmp_path: Path) -> None:
     assert 'background: #0C2340' in login.text
     assert '<img src="/assets/logo.svg" alt="">' in login.text
     assert '<a href="/">DocPilot</a>' in login.text
+    assert "<summary>Admin</summary>" not in login.text
     _sign_in(client)
     documents = client.get("/admin")
     reset = client.get("/admin/reset")
-    for page in (documents, reset):
+    password = client.get("/admin/password")
+    for page in (documents, reset, password):
         assert page.status_code == 200
         assert '<img src="/assets/logo.svg" alt="">' in page.text
         assert '<a href="/">DocPilot</a>' in page.text
+        assert "<summary>Admin</summary>" in page.text
+        assert '<a href="/admin">Documents</a>' in page.text
+        assert '<a href="/admin/reset">Reset Catalog</a>' in page.text
+        assert '<a href="/admin/password">Change Password</a>' in page.text
+        assert ">Sign Out</button>" in page.text
+    assert 'href="/admin/reset">Reset catalog' not in documents.text
+    assert ">Sign out</button>" not in documents.text
 
 
 def test_admin_pages_use_the_logo_as_favicon(tmp_path: Path) -> None:
