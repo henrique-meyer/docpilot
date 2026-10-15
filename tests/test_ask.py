@@ -148,6 +148,9 @@ def test_home_page_states_the_disclaimer(tmp_path: Path) -> None:
     page = client.get("/")
     assert page.status_code == 200
     assert "informational only" in page.text
+    assert "selected set for demonstration" in page.text
+    assert "not a complete library" in page.text
+    assert "definitive guide" in page.text
     assert 'href="/assets/logo.svg"' in page.text
     assert 'class="catalog-summary"' not in page.text
     assert client.get("/health").json() == {"status": "ok"}

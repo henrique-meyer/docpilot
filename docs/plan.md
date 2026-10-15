@@ -415,6 +415,14 @@ On startup, resume every document that is queued or processing. Read the stored 
 
 A failed row can be retried. The catalog shows a Retry control on a failed document. Retry reads the stored PDF, sets the status back to processing, and runs ingest again. The stored file stays. A retry that fails stays failed and can be retried again. Ready and processing rows do not show Retry.
 
+### DOCPILOT-47 — Say the uploaded documents are a demonstration set
+
+Found Thursday 15 October 2026.
+
+The homepage disclaimer stays one paragraph with the existing line that answers come from the uploaded documents and are informational only.
+
+That same paragraph also says the uploaded documents are a selected set for demonstration, not a complete library on the topic. A visitor should not treat the answers as a definitive guide. The wording stays general, because the live set is whatever an admin uploads.
+
 ## Issue index
 
 | Key | Summary | Due | URL |
@@ -465,3 +473,4 @@ A failed row can be retried. The catalog shows a Retry control on a failed docum
 | DOCPILOT-44 | Submit the ask box with Enter | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-44 |
 | DOCPILOT-45 | Environment setup guide with placeholder resource names | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-45 |
 | DOCPILOT-46 | Resume indexing after a restart, and retry a failed document | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-46 |
+| DOCPILOT-47 | Say the uploaded documents are a demonstration set | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-47 |
