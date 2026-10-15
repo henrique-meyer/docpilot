@@ -30,9 +30,9 @@ DocPilot was built with an **AI-native development workflow**: AI agents do much
 Python 3.12 · FastAPI · Microsoft Agent Framework · Microsoft Foundry · Azure AI Search · LangChain (baseline) · OpenTelemetry · Docker · Azure Container Apps · Azure Key Vault · GitHub Actions · Jira · Cursor · Grok Bot
 
 ## Azure resources
-One resource group, in East US 2. The group name, subscription, and any custom domain stay out of this repo.
+One resource group. Everything except Azure AI Search is in East US 2. Search is in East US. Names, the subscription, and any custom domain stay out of this repo. [Environment setup](docs/setup.md) lists the SKU and settings for each resource, the Key Vault secrets, and how to fill `.env` with your own names.
 
-- Microsoft Foundry account `ais-docpilot-prod` and project `docpilot-prod`, with a chat deployment (`gpt-6.1-sol`) and an embeddings deployment (`text-embedding-3-small` at 512 dimensions)
+- A Microsoft Foundry account and project, with a chat deployment (`gpt-6.1-sol`) and an embeddings deployment (`text-embedding-3-small` at 512 dimensions)
 - Azure AI Search on the Free tier, in East US, because East US 2 had no free-tier capacity
 - A storage account with shared keys disabled, and one private blob container for source PDFs
 - Key Vault, for the admin password hash and the session secret
@@ -51,12 +51,7 @@ docker compose up --build
 
 The API listens on port 8000. `/` asks a question. `/admin` is the document catalog. The first visitor sets the admin password; later visits sign in with it. Jaeger is at <http://localhost:16686>.
 
-Sample catalogs live in `sample-docs/<set>/SOURCES.md`. The PDFs stay out of git. This downloads one catalog, then loads it through the same path as an admin upload:
-
-```bash
-make fetch SET=irs
-make seed SET=irs
-```
+Starting the app does not index a corpus. An admin uploads PDFs on `/admin`. The files under `sample-docs/` are there for that upload. To call Foundry and Search from this machine, fill an environment file as described in [Environment setup](docs/setup.md).
 
 ## Azure
 
