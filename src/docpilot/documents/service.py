@@ -248,13 +248,55 @@ class DocumentService:
             if record.status in {"queued", "processing"}
         ]
 
-    def resume_ids(self, document_ids: list[str]) -> None:
-        for document_id in document_ids:
-            for attempt in range(4):
-                if self._resume_one(document_id):
-                    break
-                if attempt < 3:
-                    time.sleep(15)
+    def watch_incomplete(self, stop: threading.Event, *, pause: float = 15) -> None:
+        """Keep trying queued and processing documents until each is ready or failed.
+
+        A transient error leaves the row processing. The next pass tries it again.
+        Another worker holding the claim is skipped until the claim is free.
+        """
+        not_before: dict[str, float] = {}
+        delay_for: dict[str, float] = {}
+        while not stop.is_set():
+            try:
+                pending = self.incomplete_ids()
+            except Exception:
+                logger.exception("could not list documents to index")
+                if stop.wait(pause):
+                    return
+                continue
+            active = set(pending)
+            for document_id in list(not_before):
+                if document_id not in active:
+                    not_before.pop(document_id, None)
+                    delay_for.pop(document_id, None)
+            now = time.monotonic()
+            for document_id in pending:
+                if stop.is_set():
+                    return
+                if now < not_before.get(document_id, 0):
+                    continue
+                outcome = "retry"
+                try:
+                    outcome = self._resume_one(document_id)
+                except Exception:
+                    logger.exception("index attempt failed for %s", document_id)
+                if outcome == "done":
+                    not_before.pop(document_id, None)
+                    delay_for.pop(document_id, None)
+                elif outcome == "busy":
+                    not_before[document_id] = time.monotonic() + pause
+                else:
+                    delay = delay_for.get(document_id, pause)
+                    delay_for[document_id] = min(delay * 2, 300.0)
+                    not_before[document_id] = time.monotonic() + delay
+            upcoming = [
+                moment for moment in not_before.values() if moment > time.monotonic()
+            ]
+            wait = pause
+            if upcoming:
+                wait = min(wait, max(0.0, min(upcoming) - time.monotonic()))
+            if stop.wait(wait):
+                return
 
     def begin_retry(self, document_id: str) -> None:
         with self._lock:
@@ -273,18 +315,18 @@ class DocumentService:
             self.store.put_record(record)
             self._audit("retry", record.id, _label(record))
 
-    def index_stored(self, document_id: str) -> bool:
+    def index_stored(self, document_id: str) -> str:
         record = self.store.get_record(document_id)
         if record is None or record.status not in {"queued", "processing"}:
-            return True
+            return "done"
         data = self.store.get_pdf(document_id)
         if data is None:
             self._mark_failed(document_id, "failed", MESSAGES["store_failed"], zero_index=True)
-            return True
+            return "done"
         with self._lock:
             current = self.store.get_record(document_id)
             if current is None or current.status not in {"queued", "processing"}:
-                return True
+                return "done"
             return self._index_held(
                 current,
                 data,
@@ -294,13 +336,13 @@ class DocumentService:
                 zero_index=True,
             )
 
-    def _resume_one(self, document_id: str) -> bool:
+    def _resume_one(self, document_id: str) -> str:
         record = self.store.get_record(document_id)
         if record is None or record.status not in {"queued", "processing"}:
-            return True
+            return "done"
         if self.store.get_pdf(document_id) is None:
             self._mark_failed(document_id, "failed", MESSAGES["store_failed"], zero_index=True)
-            return True
+            return "done"
         return self.index_stored(document_id)
 
     def _index_held(
@@ -312,11 +354,12 @@ class DocumentService:
         failure_action: str,
         failure_fallback: str,
         zero_index: bool,
-    ) -> bool:
-        claim = self._keep_claim(record.id)
-        if claim is None:
-            return False
+    ) -> str:
+        claim: _RenewedClaim | None = None
         try:
+            claim = self._keep_claim(record.id)
+            if claim is None:
+                return "busy"
             info = extract_pdf(data)
             self._ensure_capacity(info.index_bytes, excluding=record.id)
             result = self.ingestor.ingest(
@@ -329,7 +372,7 @@ class DocumentService:
             current = self.store.get_record(record.id)
             if current is None:
                 self.ingestor.delete(record.id)
-                return True
+                return "done"
             current.pages = info.pages
             current.chunk_count = result.chunk_count
             current.index_bytes = info.index_bytes
@@ -340,22 +383,17 @@ class DocumentService:
             self.store.put_record(current)
             detail = current.title if success_action == "replace" else _label(current)
             self._audit(success_action, current.id, detail)
-            return True
+            return "done"
         except DocumentError as exc:
             message = MESSAGES.get(exc.code, failure_fallback)
             self._mark_failed(record.id, failure_action, message, zero_index=zero_index)
-            return True
+            return "done"
         except Exception:
-            logger.exception("index failed for %s", record.id)
-            self._mark_failed(
-                record.id,
-                failure_action,
-                MESSAGES["index_failed"],
-                zero_index=zero_index,
-            )
-            return True
+            logger.exception("index attempt failed for %s", record.id)
+            return "retry"
         finally:
-            claim.release()
+            if claim is not None:
+                claim.release()
 
     def _keep_claim(self, document_id: str) -> _RenewedClaim | None:
         claim = self.store.claim_index(document_id)

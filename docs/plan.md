@@ -443,6 +443,16 @@ The line reads: Designed & built by Henrique Meyer · Source on GitHub
 
 Henrique Meyer links to https://www.hmeyer.dev. Source on GitHub links to https://github.com/henrique-meyer/docpilot. Both links open in a new tab. The line stays readable on a narrow window. It does not include a copyright symbol or a year, and it does not mention AI tools or agents.
 
+### DOCPILOT-50 — Keep indexing until a document is ready or failed
+
+Found Thursday 15 October 2026.
+
+A document can stay on processing after the worker that was indexing it stops. The catalog row has no error, and nothing tries again until the process starts over. A start that does not finish the file leaves it there.
+
+A queued or processing document is worked until it is ready or failed. The app keeps trying while it is running, not only at startup. If the worker stops, the next pass reads the stored PDF and runs the same ingest path again.
+
+A transient failure leaves the row processing and the next pass tries again, until the document is ready. A missing file, a file that is not a PDF, or an upload that would pass the index limit marks the row failed. Failed rows still have Retry. Ready rows are left alone.
+
 ## Issue index
 
 | Key | Summary | Due | URL |
@@ -496,3 +506,4 @@ Henrique Meyer links to https://www.hmeyer.dev. Source on GitHub links to https:
 | DOCPILOT-47 | Say the uploaded documents are a demonstration set | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-47 |
 | DOCPILOT-48 | Drop the fixed corpus and fixed limits from the docs | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-48 |
 | DOCPILOT-49 | Credit the designer and link the source | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-49 |
+| DOCPILOT-50 | Keep indexing until a document is ready or failed | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-50 |
