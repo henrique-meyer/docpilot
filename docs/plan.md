@@ -265,6 +265,12 @@ Found Thursday 15 October 2026.
 
 The admin documents page does not show the Add by URL form: the heading, the URL field, and the Add URL button. `POST /admin/api/documents/url` stays so a client can still add a PDF by URL. `download_pdf` and the route stay.
 
+### DOCPILOT-28 — Upload from a file picker or a drop zone
+
+Found Thursday 15 October 2026.
+
+On the admin documents page, a PDF can be chosen with the file picker or dropped onto a drop zone. Choosing or dropping a PDF uploads it immediately. There is no Upload button. The page shows the chosen filename and a busy or error state. Keep `POST /admin/api/documents`. Title and Year fields are already gone. The Add by URL form is already gone. Do not bring either back. Catalog and audit JSON files are replaced in one step, so the documents page can render while an upload is still being written.
+
 ### DOCPILOT-29 — Add an Admin menu to the header
 
 Found Thursday 15 October 2026.
@@ -314,6 +320,7 @@ The admin header says DocPilot Admin. The login page heading is Login. The line 
 | DOCPILOT-25 | Keep admin messages out of the address bar | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-25 |
 | DOCPILOT-26 | Export PNG copies of the logo | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-26 |
 | DOCPILOT-27 | Remove the Add by URL form | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-27 |
+| DOCPILOT-28 | Upload from a file picker or a drop zone | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-28 |
 | DOCPILOT-29 | Add an Admin menu to the header | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-29 |
 | DOCPILOT-30 | Add Cancel to the change-password page | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-30 |
 | DOCPILOT-31 | Name the admin header and simplify the login page | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-31 |
