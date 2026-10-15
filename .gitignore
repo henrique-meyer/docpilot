@@ -235,3 +235,6 @@ infra/main.bicepparam
 
 # Local admin uploads when Azure Blob is not configured
 .data/
+
+# Generated eval reports
+eval/reports/

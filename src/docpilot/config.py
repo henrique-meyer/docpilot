@@ -38,6 +38,13 @@ def _flag(name: str) -> bool:
     return os.environ.get(name, "").strip().lower() in {"1", "true", "yes"}
 
 
+def _float(name: str, default: float) -> float:
+    raw = os.environ.get(name, "").strip()
+    if not raw:
+        return default
+    return float(raw)
+
+
 def _int(name: str, default: int) -> int:
     raw = os.environ.get(name, "").strip()
     if not raw:
@@ -73,6 +80,10 @@ class Settings:
     ask_rate_limit: int = 30
     ask_rate_window_seconds: int = 60
     daily_token_cap: int = 20000
+    eval_correctness: float = 0.8
+    eval_citation_accuracy: float = 0.9
+    eval_groundedness: float = 0.8
+    eval_red_team_pass_rate: float = 1.0
 
     @property
     def admin_configured(self) -> bool:
@@ -109,4 +120,8 @@ class Settings:
             ask_rate_limit=_int("DOCPILOT_ASK_RATE_LIMIT", 30),
             ask_rate_window_seconds=_int("DOCPILOT_ASK_RATE_WINDOW_SECONDS", 60),
             daily_token_cap=_int("DOCPILOT_DAILY_TOKEN_CAP", 20000),
+            eval_correctness=_float("DOCPILOT_EVAL_CORRECTNESS", 0.8),
+            eval_citation_accuracy=_float("DOCPILOT_EVAL_CITATION_ACCURACY", 0.9),
+            eval_groundedness=_float("DOCPILOT_EVAL_GROUNDEDNESS", 0.8),
+            eval_red_team_pass_rate=_float("DOCPILOT_EVAL_RED_TEAM_PASS_RATE", 1.0),
         )
