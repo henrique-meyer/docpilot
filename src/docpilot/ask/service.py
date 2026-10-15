@@ -88,7 +88,6 @@ class AzureChat:
         client = self._openai()
         response = client.chat.completions.create(  # type: ignore[attr-defined]
             model=self._deployment,
-            temperature=0,
             messages=[{"role": "user", "content": prompt}],
         )
         text = response.choices[0].message.content or ""

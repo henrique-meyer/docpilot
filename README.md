@@ -32,7 +32,7 @@ Python 3.12 · FastAPI · Microsoft Agent Framework · Microsoft Foundry · Azur
 ## Azure resources
 One resource group, in East US 2. The group name, subscription, and any custom domain stay out of this repo.
 
-- Microsoft Foundry account `ais-docpilot-prod` and project `docpilot-prod`, with a chat deployment (`gpt-4.1-mini`) and an embeddings deployment (`text-embedding-3-small` at 512 dimensions)
+- Microsoft Foundry account `ais-docpilot-prod` and project `docpilot-prod`, with a chat deployment (`gpt-6.1-sol`) and an embeddings deployment (`text-embedding-3-small` at 512 dimensions)
 - Azure AI Search on the Free tier, in East US, because East US 2 had no free-tier capacity
 - A storage account with shared keys disabled, and one private blob container for source PDFs
 - Key Vault, for the admin password hash and the session secret
@@ -89,7 +89,7 @@ Retrieval is plain code: hybrid search, a token budget, and a versioned prompt. 
 
 ## Cost
 
-Search is Free. Chat and the judge use `gpt-4.1-mini`. Embeddings use `text-embedding-3-small` at 512 dimensions. Container Apps is Consumption, scaled to zero. The resource-group budget alert is $10.
+Search is Free. Chat and the judge use `gpt-6.1-sol` on Data Zone Standard. Embeddings use `text-embedding-3-small` at 512 dimensions. Container Apps is Consumption, scaled to zero. The resource-group budget alert is $10. Public `/ask` and `/agent` share a daily token cap, which is the spend throttle for anonymous use.
 
 ## Status
 

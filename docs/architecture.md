@@ -171,24 +171,24 @@ Checked against Microsoft's [Foundry region matrix](https://learn.microsoft.com/
 
 | Capability | East US 2 |
 | --- | --- |
-| `gpt-4.1-mini` version `2025-04-14` | Listed for Global Standard and Data Zone Standard |
+| `gpt-6.1-sol` version `2026-09-29` | Listed for Global Standard and Data Zone Standard |
 | `text-embedding-3-small` version `1` | Listed, including Data Zone Standard |
 | Azure AI Search | Free tier is offered in East US 2 |
 | Blob Storage | Offered in East US 2 |
 | Container Apps Consumption | Offered in East US 2 |
 | Managed certificate | Offered with Container Apps custom domains |
 
-Chat and the LLM judge both use `gpt-4.1-mini` so there is only one chat deployment. Deployment type is **Data Zone Standard (US)** so prompts and responses stay in the United States. Embeddings use the same deployment type at 512 dimensions.
+Chat and the LLM judge both use `gpt-6.1-sol` so there is only one chat deployment. Deployment type is **Data Zone Standard (US)** so prompts and responses stay in the United States. Embeddings use the same deployment type at 512 dimensions.
 
 ### Cost
 
-Prices below are published list rates, not an invoice. Confirm them on the [Foundry model pricing page](https://azure.microsoft.com/en-us/pricing/details/azure-openai/) before apply. Third-party snapshots in October 2026 put Global Standard `gpt-4.1-mini` near $0.40 per 1M input tokens and $1.60 per 1M output tokens, and Data Zone Standard near $0.44 and $1.76. `text-embedding-3-small` is about $0.022 per 1M tokens.
+Prices below are published list rates, not an invoice. Confirm them on the [Foundry model pricing page](https://azure.microsoft.com/en-us/pricing/details/azure-openai/) before apply. Data Zone Standard `gpt-6.1-sol` in the US is $2.20 per 1M input tokens and $11 per 1M output tokens for short context. `text-embedding-3-small` is about $0.022 per 1M tokens.
 
 | Item | Expectation |
 | --- | --- |
 | Azure AI Search Free | $0. One service per subscription, 50 MB, 3 indexes |
 | Embedding the corpus | A sample set that fits the 50 MB index is a small embedding job, on the order of cents |
-| Weekend-scale Q&A and judging on `gpt-4.1-mini` | A few dollars if calls are not looped. A Thursday build of tests and one demo should land inside $1–5 |
+| A Friday demo of questions and judging on `gpt-6.1-sol` | A few dollars if calls are not looped. The daily token cap is what stops anonymous traffic after the demo |
 | Container Apps Consumption, scale to zero | $0 while idle. A short demo fits the monthly grant of 180,000 vCPU-seconds, 360,000 GiB-seconds, and 2 million requests |
 | GitHub Container Registry | $0 for this public or small private image. Azure Container Registry Basic is about $5 per month even when idle, so it is not used |
 | Blob Storage | Cents for the source PDFs on locally redundant storage. Azurite in Compose is $0 |
@@ -206,7 +206,7 @@ The product target is roughly $1–5 of total spend, with the $10 alert as the c
 | Corpus | No hard-coded set. Samples live in `sample-docs/<set>/`. `make seed SET=irs` uses the admin ingest path. CI evals use the IRS golden set |
 | Admin | Password hash in Key Vault, session cookie, CSRF, blob for source PDFs, in-process ingest jobs, audit log |
 | Agent stack | `agent-framework-core`, not Semantic Kernel |
-| Chat and judge | `gpt-4.1-mini` `2025-04-14`, Data Zone Standard (US) |
+| Chat and judge | `gpt-6.1-sol` `2026-09-29`, Data Zone Standard (US) |
 | Embeddings | `text-embedding-3-small`, 512 dimensions |
 | Retrieval | Plain Python, hybrid, semantic ranker only on the free allowance |
 | IaC | Bicep in `infra/` |

@@ -8,7 +8,7 @@ DocPilot answers questions from documents an admin uploaded. It does not ship wi
 
 ## Architecture
 
-A browser talks to one FastAPI app. That app parses a PDF, chunks it, embeds the chunks, and stores the file. Locally the file goes to Azurite. In Azure it goes to Blob Storage, and the app uses its managed identity. Search is hybrid, on the Free tier. The semantic ranker stays on the free allowance, and search falls back to keyword plus vector ranking when that allowance is used up. A larger Search tier would break the budget, so the index is capped at 50 MB and an upload that would pass the cap is refused. Chat and the judge use `gpt-4.1-mini`. Embeddings are `text-embedding-3-small` at 512 dimensions.
+A browser talks to one FastAPI app. That app parses a PDF, chunks it, embeds the chunks, and stores the file. Locally the file goes to Azurite. In Azure it goes to Blob Storage, and the app uses its managed identity. Search is hybrid, on the Free tier. The semantic ranker stays on the free allowance, and search falls back to keyword plus vector ranking when that allowance is used up. A larger Search tier would break the budget, so the index is capped at 50 MB and an upload that would pass the cap is refused. Chat and the judge use `gpt-6.1-sol`. Embeddings are `text-embedding-3-small` at 512 dimensions.
 
 There are two ways to ask. `/ask` retrieves passages and fills one versioned prompt. `/agent` lets Microsoft Agent Framework call three tools: search, fetch a section, and compare documents. Both paths cite the page. If the documents do not support an answer, the reply is "not found in the documents."
 
