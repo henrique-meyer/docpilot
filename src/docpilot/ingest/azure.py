@@ -87,6 +87,13 @@ class AzureChunkIndex:
         if stale:
             client.delete_documents(stale)  # type: ignore[attr-defined]
 
+    def clear(self) -> None:
+        self._ensure_index()
+        client = self._documents()
+        stale = [{"id": item["id"]} for item in client.search(search_text="*", select=["id"])]  # type: ignore[attr-defined]
+        if stale:
+            client.delete_documents(stale)  # type: ignore[attr-defined]
+
     def _ensure_index(self) -> None:
         if self._ready:
             return

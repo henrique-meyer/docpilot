@@ -19,6 +19,8 @@ class ChunkIndex(Protocol):
 
     def delete_except(self, document_id: str, keep: set[str]) -> None: ...
 
+    def clear(self) -> None: ...
+
 
 @dataclass(frozen=True)
 class IngestResult:
@@ -74,6 +76,10 @@ class Ingestor:
         if self.index is not None:
             self.index.delete_except(document_id, set())
 
+    def clear(self) -> None:
+        if self.index is not None:
+            self.index.clear()
+
     def _vectors(self, chunks: list[Chunk]) -> list[list[float]]:
         if not chunks:
             return []
@@ -100,3 +106,6 @@ class MemoryIndex:
         for chunk_id, chunk in list(self.docs.items()):
             if chunk.document_id == document_id and chunk_id not in keep:
                 del self.docs[chunk_id]
+
+    def clear(self) -> None:
+        self.docs.clear()

@@ -129,6 +129,11 @@ class DocumentService:
                 self.store.put_record(record)
                 self._audit("upload_failed", record.id, record.error)
 
+    def reset(self) -> None:
+        with self._lock:
+            self.ingestor.clear()
+            self.store.clear_corpus()
+
     def delete(self, document_id: str) -> None:
         with self._lock:
             record = self.store.get_record(document_id)

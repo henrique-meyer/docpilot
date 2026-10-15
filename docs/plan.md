@@ -217,6 +217,30 @@ Bug. Admin upload wrote a catalog record before the PDF was stored. Indexing, in
 
 Store the PDF and confirm the object size. Write the catalog record only after that confirmation. A failed upload or failed confirmation leaves no catalog record. Extraction, chunking, embeddings, and index upsert run after the file is confirmed. A later ingest failure keeps the stored PDF and the catalog entry, and marks the entry failed.
 
+### DOCPILOT-20 — Reset the catalog from admin
+
+Found Thursday 15 October 2026.
+
+A Reset catalog action deletes every source PDF, catalog record, audit event, and search chunk after a Yes or No confirmation. Yes leaves the audit log empty. The admin password store stays.
+
+### DOCPILOT-21 — Reset the admin password
+
+Found Thursday 15 October 2026.
+
+A signed-in admin opens a page and sets a new password. The hash is replaced. The password is not stored. The current session stays valid.
+
+### DOCPILOT-22 — Read title and year from the PDF
+
+Found Thursday 15 October 2026.
+
+Remove Title and Year from the upload, URL, and replace forms. Ingest reads them from the PDF metadata and text. Upload and seed use the same reading.
+
+### DOCPILOT-23 — Add the public header to admin
+
+Found Thursday 15 October 2026.
+
+Admin pages use the public navy header, the existing `assets/logo.svg` mark, and the DocPilot name.
+
 ## Issue index
 
 | Key | Summary | Due | URL |
@@ -240,3 +264,7 @@ Store the PDF and confirm the object size. Write the catalog record only after t
 | DOCPILOT-17 | Admin catalog, upload, and capacity | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-17 |
 | DOCPILOT-18 | Delete, replace, blob storage, and audit | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-18 |
 | DOCPILOT-19 | Store the PDF before cataloging it | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-19 |
+| DOCPILOT-20 | Reset the catalog from admin | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-20 |
+| DOCPILOT-21 | Reset the admin password | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-21 |
+| DOCPILOT-22 | Read title and year from the PDF | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-22 |
+| DOCPILOT-23 | Add the public header to admin | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-23 |
