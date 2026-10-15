@@ -352,8 +352,6 @@ async def upload_document(
     request: Request,
     background: BackgroundTasks,
     file: Annotated[UploadFile | None, File()] = None,
-    title: str = Form(""),
-    year: str = Form(""),
     csrf: str = Form(""),
 ) -> Response:
     denied = _require_admin(request)
@@ -368,9 +366,7 @@ async def upload_document(
         request,
         background,
         data=data,
-        title=title,
         source=source,
-        year=year,
         notice="upload_queued",
     )
 
@@ -380,8 +376,6 @@ def upload_url(
     request: Request,
     background: BackgroundTasks,
     url: str = Form(""),
-    title: str = Form(""),
-    year: str = Form(""),
     csrf: str = Form(""),
 ) -> Response:
     denied = _require_admin(request)
@@ -398,9 +392,7 @@ def upload_url(
         request,
         background,
         data=data,
-        title=title,
         source=url.strip(),
-        year=year,
         notice="upload_queued",
     )
 
@@ -411,8 +403,6 @@ async def replace_document(
     request: Request,
     background: BackgroundTasks,
     file: Annotated[UploadFile | None, File()] = None,
-    title: str = Form(""),
-    year: str = Form(""),
     csrf: str = Form(""),
 ) -> Response:
     denied = _require_admin(request)
@@ -430,7 +420,7 @@ async def replace_document(
     except DocumentError as exc:
         status = 404 if exc.code == "not_found" else 400
         return _error_response(request, exc.code, status)
-    background.add_task(service.finish_replace, document_id, data, title=title, year=year)
+    background.add_task(service.finish_replace, document_id, data)
     return _accepted(request, "replace_queued")
 
 
@@ -540,14 +530,12 @@ def _queue_upload(
     background: BackgroundTasks,
     *,
     data: bytes,
-    title: str,
     source: str,
-    year: str,
     notice: str,
 ) -> Response:
     service = _service(request)
     try:
-        record = service.begin_upload(data, title=title, source=source, year=year)
+        record = service.begin_upload(data, source=source)
     except DocumentError as exc:
         return _error_response(request, exc.code, 400)
     background.add_task(service.finish_upload, record.id, data)

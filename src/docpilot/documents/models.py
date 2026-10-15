@@ -46,8 +46,15 @@ class PdfInfo:
 
 
 def _require_str(payload: dict[str, object], key: str) -> str:
+    value = _string(payload, key)
+    if not value:
+        raise DocumentError("corrupt")
+    return value
+
+
+def _string(payload: dict[str, object], key: str) -> str:
     value = payload.get(key)
-    if not isinstance(value, str) or not value:
+    if not isinstance(value, str):
         raise DocumentError("corrupt")
     return value
 
@@ -86,7 +93,7 @@ def record_from_json(payload: object) -> DocumentRecord:
         raise DocumentError("corrupt")
     return DocumentRecord(
         id=_require_str(data, "id"),
-        title=_require_str(data, "title"),
+        title=_string(data, "title"),
         source=_require_str(data, "source"),
         year=_optional_str(data, "year"),
         pages=_require_int(data, "pages"),

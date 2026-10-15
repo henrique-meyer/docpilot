@@ -20,10 +20,12 @@ from docpilot.main import create_app
 PASSWORD = "correct-horse"
 
 
-def _pdf(pages: int = 1) -> bytes:
+def _pdf(pages: int = 1, title: str = "") -> bytes:
     writer = PdfWriter()
     for _ in range(pages):
         writer.add_blank_page(width=72, height=72)
+    if title:
+        writer.add_metadata({"/Title": title})
     buffer = BytesIO()
     writer.write(buffer)
     return buffer.getvalue()
@@ -164,6 +166,8 @@ def test_upload_replace_and_delete(tmp_path: Path) -> None:
     store = MemoryDocumentStore()
     client = _app(tmp_path, store)
     csrf = _sign_in(client)
+    assert 'name="title"' not in client.get("/admin").text
+    assert 'name="year"' not in client.get("/admin").text
 
     missing = client.post(
         "/admin/api/documents",
@@ -176,13 +180,13 @@ def test_upload_replace_and_delete(tmp_path: Path) -> None:
 
     uploaded = client.post(
         "/admin/api/documents",
-        data={"csrf": csrf, "title": "Visitor guide", "year": "2026"},
-        files={"file": ("guide.pdf", _pdf(), "application/pdf")},
+        data={"csrf": csrf},
+        files={"file": ("guide.pdf", _pdf(title="2026 Visitor guide"), "application/pdf")},
         follow_redirects=False,
     )
     assert uploaded.status_code == 303
     catalog = client.get("/admin/api/documents").json()
-    assert catalog["documents"][0]["title"] == "Visitor guide"
+    assert catalog["documents"][0]["title"] == "2026 Visitor guide"
     assert catalog["documents"][0]["year"] == "2026"
     assert catalog["documents"][0]["status"] == "ready"
     assert catalog["documents"][0]["pages"] == 1
@@ -194,12 +198,14 @@ def test_upload_replace_and_delete(tmp_path: Path) -> None:
     csrf = _csrf(page.text)
     replaced = client.post(
         f"/admin/api/documents/{document_id}/replace",
-        data={"csrf": csrf, "title": "Visitor guide", "year": "2026"},
-        files={"file": ("guide.pdf", _pdf(pages=2), "application/pdf")},
+        data={"csrf": csrf},
+        files={"file": ("guide.pdf", _pdf(pages=2, title="2024 Replacement"), "application/pdf")},
         follow_redirects=False,
     )
     assert replaced.status_code == 303
     catalog = client.get("/admin/api/documents").json()
+    assert catalog["documents"][0]["title"] == "2024 Replacement"
+    assert catalog["documents"][0]["year"] == "2024"
     assert catalog["documents"][0]["pages"] == 2
     assert len(store.pdfs) == 1
 
@@ -395,16 +401,16 @@ def test_upload_stops_at_the_index_limit(tmp_path: Path, monkeypatch: MonkeyPatc
     csrf = _sign_in(client)
     first = client.post(
         "/admin/api/documents",
-        data={"csrf": csrf, "title": "First"},
-        files={"file": ("a.pdf", _pdf(), "application/pdf")},
+        data={"csrf": csrf},
+        files={"file": ("a.pdf", _pdf(title="First"), "application/pdf")},
         follow_redirects=True,
     )
     assert first.status_code == 200
     csrf = _csrf(first.text)
     client.post(
         "/admin/api/documents",
-        data={"csrf": csrf, "title": "Second"},
-        files={"file": ("b.pdf", _pdf(), "application/pdf")},
+        data={"csrf": csrf},
+        files={"file": ("b.pdf", _pdf(title="Second"), "application/pdf")},
         follow_redirects=True,
     )
     documents = client.get("/admin/api/documents").json()["documents"]
@@ -440,8 +446,8 @@ def test_file_store_round_trip(tmp_path: Path) -> None:
     csrf = _sign_in(client)
     client.post(
         "/admin/api/documents",
-        data={"csrf": csrf, "title": "On disk"},
-        files={"file": ("disk.pdf", _pdf(), "application/pdf")},
+        data={"csrf": csrf},
+        files={"file": ("disk.pdf", _pdf(title="On disk"), "application/pdf")},
     )
     restored = FileDocumentStore(tmp_path)
     records = restored.list_records()
@@ -674,7 +680,7 @@ def test_catalog_is_written_only_after_the_blob_is_confirmed(tmp_path: Path) -> 
         return IngestResult(pages=1, chunk_count=0, index_bytes=1)
 
     service.ingestor.ingest = ingest  # type: ignore[method-assign]
-    record = service.begin_upload(data, title="Pub 17", source="p17.pdf", year=None)
+    record = service.begin_upload(data, source="p17.pdf")
     assert store.events == ["put_pdf", "confirm_pdf", "record:queued"]
     assert store.pdfs[record.id] == data
     service.finish_upload(record.id, data)
@@ -689,7 +695,7 @@ def test_failed_blob_confirmation_leaves_no_catalog_record(tmp_path: Path) -> No
     store = _RefuseConfirm()
     service = DocumentService(store, _settings(tmp_path))
     with raises(DocumentError) as caught:
-        service.begin_upload(_pdf(), title="Pub 17", source="p17.pdf", year=None)
+        service.begin_upload(_pdf(), source="p17.pdf")
     assert caught.value.code == "store_failed"
     assert store.events == ["put_pdf", "confirm_pdf", "delete_pdf"]
     assert store.list_records() == []
@@ -700,7 +706,7 @@ def test_failed_ingest_keeps_the_stored_pdf(tmp_path: Path) -> None:
     store = MemoryDocumentStore()
     service = DocumentService(store, _settings(tmp_path), ingestor=_BoomIngestor())  # type: ignore[arg-type]
     data = _pdf()
-    record = service.begin_upload(data, title="Pub 17", source="p17.pdf", year=None)
+    record = service.begin_upload(data, source="p17.pdf")
     service.finish_upload(record.id, data)
     saved = store.get_record(record.id)
     assert saved is not None
