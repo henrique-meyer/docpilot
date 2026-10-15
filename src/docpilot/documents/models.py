@@ -6,6 +6,9 @@ from typing import cast
 from docpilot.documents.errors import DocumentError
 
 STATUSES = {"queued", "processing", "ready", "failed"}
+TITLE_LIMIT = 200
+SUMMARY_LIMIT = 2000
+QUESTION_LIMIT = 300
 
 
 @dataclass
@@ -37,6 +40,41 @@ class AuditEvent:
 
     def to_json(self) -> dict[str, object]:
         return cast(dict[str, object], asdict(self))
+
+
+@dataclass(frozen=True)
+class CatalogSummary:
+    title: str
+    summary: str
+    questions: tuple[str, str, str]
+
+    def to_json(self) -> dict[str, object]:
+        return {
+            "title": self.title,
+            "summary": self.summary,
+            "questions": list(self.questions),
+        }
+
+
+def empty_summary() -> CatalogSummary:
+    return CatalogSummary("", "", ("", "", ""))
+
+
+def summary_from_json(payload: object) -> CatalogSummary:
+    data = _as_object_dict(payload)
+    questions = data.get("questions")
+    if not isinstance(questions, list) or len(questions) != 3:
+        raise DocumentError("corrupt")
+    parsed: list[str] = []
+    for item in questions:
+        if not isinstance(item, str):
+            raise DocumentError("corrupt")
+        parsed.append(item)
+    return CatalogSummary(
+        _string(data, "title"),
+        _string(data, "summary"),
+        (parsed[0], parsed[1], parsed[2]),
+    )
 
 
 @dataclass(frozen=True)

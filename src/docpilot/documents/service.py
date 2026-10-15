@@ -13,7 +13,15 @@ from datetime import UTC, datetime
 from docpilot.config import Settings
 from docpilot.documents.describe import read_title, read_year
 from docpilot.documents.errors import MESSAGES, DocumentError
-from docpilot.documents.models import AuditEvent, DocumentRecord
+from docpilot.documents.models import (
+    QUESTION_LIMIT,
+    SUMMARY_LIMIT,
+    TITLE_LIMIT,
+    AuditEvent,
+    CatalogSummary,
+    DocumentRecord,
+    empty_summary,
+)
 from docpilot.documents.pdf import extract_pdf
 from docpilot.documents.store import DocumentStore
 from docpilot.ingest.pipeline import Ingestor, MemoryIndex
@@ -43,6 +51,32 @@ class DocumentService:
     def list_audit(self, limit: int = 30) -> list[AuditEvent]:
         events = sorted(self.store.list_audit(), key=lambda event: event.id, reverse=True)
         return events[:limit]
+
+    def get_summary(self) -> CatalogSummary:
+        found = self.store.get_summary()
+        if found is None:
+            return empty_summary()
+        return found
+
+    def save_summary(
+        self,
+        title: str,
+        summary: str,
+        questions: tuple[str, str, str],
+    ) -> CatalogSummary:
+        saved = CatalogSummary(
+            _bounded(title, TITLE_LIMIT),
+            _bounded(summary, SUMMARY_LIMIT),
+            (
+                _bounded(questions[0], QUESTION_LIMIT),
+                _bounded(questions[1], QUESTION_LIMIT),
+                _bounded(questions[2], QUESTION_LIMIT),
+            ),
+        )
+        with self._lock:
+            self.store.put_summary(saved)
+            self._audit("catalog_summary", None, "Catalog summary saved")
+        return saved
 
     def index_bytes_used(self, excluding: str | None = None) -> int:
         total = 0
@@ -269,6 +303,13 @@ class DocumentService:
 
 def _label(record: DocumentRecord) -> str:
     return record.title or record.source
+
+
+def _bounded(value: str, limit: int) -> str:
+    text = " ".join(value.split()).strip()
+    if len(text) > limit:
+        raise DocumentError("summary_long")
+    return text
 
 
 def _clean(value: str, *, fallback: str) -> str:
