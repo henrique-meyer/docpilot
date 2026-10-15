@@ -94,6 +94,22 @@ def test_health_stays_public(tmp_path: Path) -> None:
     assert response.json() == {"status": "ok"}
 
 
+def test_admin_pages_use_the_public_header(tmp_path: Path) -> None:
+    client = _app(tmp_path)
+    login = client.get("/admin/login")
+    assert login.status_code == 200
+    assert 'background: #0C2340' in login.text
+    assert '<img src="/assets/logo.svg" alt="">' in login.text
+    assert '<a href="/">DocPilot</a>' in login.text
+    _sign_in(client)
+    documents = client.get("/admin")
+    reset = client.get("/admin/reset")
+    for page in (documents, reset):
+        assert page.status_code == 200
+        assert '<img src="/assets/logo.svg" alt="">' in page.text
+        assert '<a href="/">DocPilot</a>' in page.text
+
+
 def test_admin_pages_use_the_logo_as_favicon(tmp_path: Path) -> None:
     client = _app(tmp_path)
     page = client.get("/admin/login")
