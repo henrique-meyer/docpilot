@@ -10,9 +10,10 @@ from pytest import MonkeyPatch, raises
 from docpilot.admin.auth import hash_password
 from docpilot.config import Settings
 from docpilot.documents.errors import DocumentError
-from docpilot.documents.models import DocumentRecord, PdfInfo
+from docpilot.documents.models import AuditEvent, DocumentRecord, PdfInfo
 from docpilot.documents.service import DocumentService
 from docpilot.documents.store import FileDocumentStore, MemoryDocumentStore
+from docpilot.ingest.chunk import Chunk
 from docpilot.ingest.pipeline import IngestResult
 from docpilot.main import create_app
 
@@ -326,6 +327,104 @@ def test_second_visitor_cannot_replace_the_password(tmp_path: Path) -> None:
         follow_redirects=False,
     )
     assert owner.status_code == 303
+
+
+def test_reset_catalog_clears_documents_and_the_audit(tmp_path: Path) -> None:
+    store = FileDocumentStore(tmp_path)
+    (tmp_path / "admin-login.json").write_text('{"password_hash":"kept"}', encoding="utf-8")
+    client = _app(tmp_path, store)
+    csrf = _sign_in(client)
+    uploaded = client.post(
+        "/admin/api/documents",
+        data={"csrf": csrf, "title": "Visitor guide", "year": "2026"},
+        files={"file": ("guide.pdf", _pdf(), "application/pdf")},
+        follow_redirects=False,
+    )
+    assert uploaded.status_code == 303
+    assert store.list_records()
+    assert store.list_audit()
+    index = client.app.state.documents.ingestor.index
+    index.docs["orphan"] = Chunk(
+        id="orphan",
+        document_id="other",
+        title="Old",
+        source="old.pdf",
+        year=None,
+        section="",
+        page=1,
+        content="stale",
+    )
+    outsider = TestClient(client.app)
+    blocked = outsider.get("/admin/reset", follow_redirects=False)
+    assert blocked.status_code == 303
+    assert blocked.headers["location"] == "/admin/login"
+
+    page = client.get("/admin/reset")
+    assert page.status_code == 200
+    assert "audit log" in page.text
+    declined = client.post(
+        "/admin/reset",
+        data={"csrf": _csrf(page.text), "confirm": "no"},
+        follow_redirects=False,
+    )
+    assert declined.status_code == 303
+    assert declined.headers["location"] == "/admin"
+    assert store.list_records()
+    assert store.list_audit()
+
+    page = client.get("/admin/reset")
+    missing = client.post("/admin/reset", data={"csrf": _csrf(page.text)}, follow_redirects=False)
+    assert missing.status_code == 303
+    assert store.list_records()
+
+    page = client.get("/admin/reset")
+    wiped = client.post(
+        "/admin/reset",
+        data={"csrf": _csrf(page.text), "confirm": "yes"},
+        follow_redirects=True,
+    )
+    assert wiped.status_code == 200
+    assert "audit log were deleted" in wiped.text
+    assert store.list_records() == []
+    assert store.list_audit() == []
+    assert list((tmp_path / "pdfs").glob("*.pdf")) == []
+    assert index.docs == {}
+    assert (tmp_path / "admin-login.json").read_text(encoding="utf-8") == '{"password_hash":"kept"}'
+
+
+def test_file_store_clear_corpus_leaves_the_admin_login(tmp_path: Path) -> None:
+    (tmp_path / "admin-login.json").write_text("{}", encoding="utf-8")
+    store = FileDocumentStore(tmp_path)
+    store.put_pdf("abc", b"%PDF-1")
+    store.put_record(
+        DocumentRecord(
+            id="abc",
+            title="Guide",
+            source="guide.pdf",
+            year=None,
+            pages=1,
+            chunk_count=0,
+            index_bytes=0,
+            source_bytes=6,
+            ingested_at=None,
+            status="ready",
+        )
+    )
+    store.put_audit(
+        AuditEvent(
+            id="evt",
+            at="2026-10-15T00:00:00+00:00",
+            actor="admin",
+            action="upload",
+            document_id="abc",
+            detail="Guide",
+        )
+    )
+    store.clear_corpus()
+    assert store.list_records() == []
+    assert store.list_audit() == []
+    assert not (tmp_path / "pdfs" / "abc.pdf").exists()
+    assert (tmp_path / "admin-login.json").read_text(encoding="utf-8") == "{}"
 
 
 class _RecordingStore(MemoryDocumentStore):

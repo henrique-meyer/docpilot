@@ -32,6 +32,8 @@ class DocumentStore(Protocol):
 
     def list_audit(self) -> list[AuditEvent]: ...
 
+    def clear_corpus(self) -> None: ...
+
 
 class MemoryDocumentStore:
     def __init__(self) -> None:
@@ -66,6 +68,11 @@ class MemoryDocumentStore:
 
     def list_audit(self) -> list[AuditEvent]:
         return list(self.audit)
+
+    def clear_corpus(self) -> None:
+        self.pdfs.clear()
+        self.records.clear()
+        self.audit.clear()
 
 
 class FileDocumentStore:
@@ -111,6 +118,15 @@ class FileDocumentStore:
         for path in self._json_files("audit"):
             events.append(audit_from_json(json.loads(path.read_text(encoding="utf-8"))))
         return events
+
+    def clear_corpus(self) -> None:
+        for folder in ("pdfs", "catalog", "audit"):
+            directory = self.root / folder
+            if not directory.is_dir():
+                continue
+            for path in directory.iterdir():
+                if path.is_file():
+                    path.unlink()
 
     def _path(self, folder: str, name: str) -> Path:
         directory = self.root / folder
@@ -180,6 +196,11 @@ class AzureBlobStore:
             if payload is not None:
                 events.append(audit_from_json(json.loads(payload)))
         return events
+
+    def clear_corpus(self) -> None:
+        for prefix in ("documents/", "catalog/", "audit/"):
+            for name in self._names(prefix):
+                self._delete(name)
 
     def _client(self) -> object:
         if self._container is not None:

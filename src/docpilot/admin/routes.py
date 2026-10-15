@@ -32,6 +32,7 @@ NOTICES = {
     "upload_queued": "The file is stored. Indexing continues until the status is ready.",
     "replace_queued": "Replacement started. The previous file stays until the new one is stored.",
     "deleted": "Document deleted.",
+    "reset": "Catalog, documents, and the audit log were deleted.",
     "logged_out": "Signed out.",
 }
 
@@ -396,6 +397,32 @@ def delete_document(document_id: str, request: Request, csrf: str = Form("")) ->
 @router.delete("/admin/api/documents/{document_id}")
 def delete_document_method(document_id: str, request: Request, csrf: str = Form("")) -> Response:
     return _delete(document_id, request, csrf)
+
+
+@router.get("/admin/reset")
+def reset_page(request: Request) -> Response:
+    denied = _require_admin(request)
+    if denied is not None:
+        return denied
+    session = read_session(request, _settings(request))
+    return _render(
+        "reset.html",
+        csrf=session.csrf if session else "",
+    )
+
+
+@router.post("/admin/reset")
+def reset_catalog(request: Request, csrf: str = Form(""), confirm: str = Form("")) -> Response:
+    denied = _require_admin(request)
+    if denied is not None:
+        return denied
+    denied = _require_csrf(request, csrf)
+    if denied is not None:
+        return denied
+    if confirm != "yes":
+        return _no_store(RedirectResponse("/admin", status_code=303))
+    _service(request).reset()
+    return _no_store(RedirectResponse("/admin?notice=reset", status_code=303))
 
 
 def _delete(document_id: str, request: Request, csrf: str) -> Response:
