@@ -86,6 +86,9 @@ class Settings:
     eval_red_team_pass_rate: float = 1.0
     agent_max_tool_calls: int = 6
     agent_timeout_seconds: int = 30
+    otlp_endpoint: str = ""
+    appinsights_connection_string: str = ""
+    otel_sample_ratio: float = 1.0
 
     @property
     def admin_configured(self) -> bool:
@@ -128,4 +131,9 @@ class Settings:
             eval_red_team_pass_rate=_float("DOCPILOT_EVAL_RED_TEAM_PASS_RATE", 1.0),
             agent_max_tool_calls=_int("DOCPILOT_AGENT_MAX_TOOL_CALLS", 6),
             agent_timeout_seconds=_int("DOCPILOT_AGENT_TIMEOUT_SECONDS", 30),
+            otlp_endpoint=os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT", "").strip(),
+            appinsights_connection_string=os.environ.get(
+                "APPLICATIONINSIGHTS_CONNECTION_STRING", ""
+            ).strip(),
+            otel_sample_ratio=_float("DOCPILOT_OTEL_SAMPLE_RATIO", 1.0),
         )

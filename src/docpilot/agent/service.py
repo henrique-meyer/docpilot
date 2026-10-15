@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import uuid
 from dataclasses import dataclass
 from typing import Protocol
@@ -10,8 +11,10 @@ from typing import Protocol
 from docpilot.agent.tools import ToolKit
 from docpilot.ask.service import NOT_FOUND, PassageSource, _is_not_found
 from docpilot.config import Settings
+from docpilot.observe import bind_trace, span
 
 TIMED_OUT = "timed out"
+logger = logging.getLogger(__name__)
 INSTRUCTIONS = """You answer questions about the documents an admin has uploaded.
 Use search_documents to look up a fact, get_section to open one section, and compare_documents when the question asks what more than one document says about a topic.
 Answer only from tool results. If the tools do not contain the answer, reply exactly: not found in the documents
@@ -56,25 +59,35 @@ class Pilot:
 
     async def ask(self, question: str) -> AgentResult:
         trace_id = uuid.uuid4().hex
-        if _refused(question) or self.runner is None:
-            return AgentResult(NOT_FOUND, [], trace_id, [])
-        toolkit = ToolKit(self.retriever, self.max_tool_calls)
-        try:
-            text, tokens = await asyncio.wait_for(
-                self.runner.run(question, toolkit),
-                timeout=self.timeout_seconds,
-            )
-        except TimeoutError:
-            return AgentResult(
-                TIMED_OUT,
-                toolkit.citations(),
-                trace_id,
-                toolkit.calls,
-                timed_out=True,
-            )
-        if not toolkit.hits or _is_not_found(text):
-            return AgentResult(NOT_FOUND, [], trace_id, toolkit.calls, tokens)
-        return AgentResult(text.strip(), toolkit.citations(), trace_id, toolkit.calls, tokens)
+        bind_trace(trace_id)
+        with span("api.agent") as current:
+            if _refused(question) or self.runner is None:
+                current.set_attribute("tokens", 0)
+                logger.info("agent completed")
+                return AgentResult(NOT_FOUND, [], trace_id, [])
+            toolkit = ToolKit(self.retriever, self.max_tool_calls)
+            try:
+                text, tokens = await asyncio.wait_for(
+                    self.runner.run(question, toolkit),
+                    timeout=self.timeout_seconds,
+                )
+            except TimeoutError:
+                current.set_attribute("tokens", 0)
+                current.set_attribute("timed_out", True)
+                logger.info("agent completed")
+                return AgentResult(
+                    TIMED_OUT,
+                    toolkit.citations(),
+                    trace_id,
+                    toolkit.calls,
+                    timed_out=True,
+                )
+            current.set_attribute("tokens", tokens)
+            current.set_attribute("tool_calls", len(toolkit.calls))
+            logger.info("agent completed")
+            if not toolkit.hits or _is_not_found(text):
+                return AgentResult(NOT_FOUND, [], trace_id, toolkit.calls, tokens)
+            return AgentResult(text.strip(), toolkit.citations(), trace_id, toolkit.calls, tokens)
 
 
 def _refused(question: str) -> bool:
@@ -110,8 +123,11 @@ class FrameworkRunner:
                 toolkit.compare_documents,
             ],
         )
-        response = await agent.run(question)
-        return _text(response), _tokens(response)
+        with span("llm", deployment=self._deployment) as current:
+            response = await agent.run(question)
+            tokens = _tokens(response)
+            current.set_attribute("tokens", tokens)
+        return _text(response), tokens
 
 
 def _text(response: object) -> str:

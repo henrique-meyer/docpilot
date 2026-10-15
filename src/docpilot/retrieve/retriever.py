@@ -3,6 +3,7 @@
 from typing import Protocol
 
 from docpilot.config import Settings
+from docpilot.observe import span
 from docpilot.retrieve.context import Hit, select_hits
 
 
@@ -31,14 +32,19 @@ class Retriever:
         self.token_budget = token_budget
 
     def retrieve(self, question: str) -> list[Hit]:
-        text = question.strip()
-        if not text:
-            return []
-        vectors = self.embedder.embed([text])
-        if not vectors or not vectors[0]:
-            return []
-        raw = self.searcher.search(text, vectors[0], self.top_k)
-        return select_hits(raw, token_budget=self.token_budget)
+        with span("retrieval") as current:
+            text = question.strip()
+            if not text:
+                current.set_attribute("hits", 0)
+                return []
+            vectors = self.embedder.embed([text])
+            if not vectors or not vectors[0]:
+                current.set_attribute("hits", 0)
+                return []
+            raw = self.searcher.search(text, vectors[0], self.top_k)
+            selected = select_hits(raw, token_budget=self.token_budget)
+            current.set_attribute("hits", len(selected))
+            return selected
 
 
 def build_retriever(settings: Settings) -> Retriever | None:

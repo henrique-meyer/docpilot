@@ -16,6 +16,7 @@ from docpilot.config import Settings
 from docpilot.documents.service import DocumentService
 from docpilot.documents.store import DocumentStore, build_store
 from docpilot.ingest import build_ingestor
+from docpilot.observe import configure_logging, configure_tracing
 from docpilot.retrieve.retriever import build_retriever
 
 
@@ -26,6 +27,8 @@ def create_app(
     pilot: Pilot | None = None,
 ) -> FastAPI:
     resolved = settings or Settings.from_env()
+    configure_logging()
+    configure_tracing(resolved)
     app = FastAPI(title="DocPilot")
     app.state.settings = resolved
     app.state.documents = DocumentService(

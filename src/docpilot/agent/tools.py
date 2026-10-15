@@ -6,6 +6,7 @@ from collections.abc import Callable
 from typing import Annotated
 
 from docpilot.ask.service import PassageSource, _citation
+from docpilot.observe import span
 from docpilot.retrieve.context import Hit
 
 LIMIT_REACHED = "tool call limit reached"
@@ -54,9 +55,10 @@ class ToolKit:
         return [_citation(hit) for hit in self.hits]
 
     def _run(self, name: str, arguments: dict[str, str], action: Callable[[], str]) -> str:
-        if len(self.calls) >= self.max_calls:
-            return self._record(name, arguments, LIMIT_REACHED)
-        return self._record(name, arguments, action())
+        with span("agent.tool", tool=name):
+            if len(self.calls) >= self.max_calls:
+                return self._record(name, arguments, LIMIT_REACHED)
+            return self._record(name, arguments, action())
 
     def _record(self, name: str, arguments: dict[str, str], result: str) -> str:
         shown = result if len(result) <= RESULT_CHARS else result[: RESULT_CHARS - 1].rstrip() + "…"
