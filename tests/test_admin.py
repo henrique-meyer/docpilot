@@ -321,6 +321,7 @@ def test_password_change_rejects_a_short_password_and_a_mismatch(tmp_path: Path)
     csrf = _sign_in(client)
     page = client.get("/admin/password")
     assert page.status_code == 200
+    assert '<a class="quiet" href="/admin">Cancel</a>' in page.text
     assert 'href="/admin/password"' in client.get("/admin").text
     short = client.post(
         "/admin/password",
