@@ -30,6 +30,21 @@
     h2 { font-size: 1.1rem; margin: 28px 0 12px; }
     p { color: var(--muted); }
     a { color: var(--accent); }
+    header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 16px 20px;
+      background: #0C2340;
+      color: #F4F0E6;
+    }
+    header img { width: 36px; height: 36px; }
+    header a {
+      color: #F4F0E6;
+      font-size: 1.15rem;
+      font-weight: 700;
+      text-decoration: none;
+    }
     form, .card {
       background: var(--card);
       border: 1px solid var(--line);
@@ -85,6 +100,10 @@
   </style>
 </head>
 <body>
+  <header>
+    <img src="/assets/logo.svg" alt="">
+    <a href="/">DocPilot</a>
+  </header>
   <main>
     {% block body %}{% endblock %}
   </main>
