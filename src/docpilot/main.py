@@ -24,17 +24,20 @@ from docpilot.observe import configure_logging, configure_tracing
 from docpilot.retrieve.retriever import build_retriever
 
 
-def _resume_on_startup(app: FastAPI) -> None:
-    if getattr(app.state, "resume_started", False):
+def _watch_index(app: FastAPI) -> None:
+    if getattr(app.state, "index_watch_started", False):
         return
-    app.state.resume_started = True
-    pending = app.state.documents.incomplete_ids()
-    threading.Thread(
-        target=app.state.documents.resume_ids,
-        args=(pending,),
-        name="docpilot-resume",
+    app.state.index_watch_started = True
+    stop = threading.Event()
+    app.state.index_stop = stop
+    thread = threading.Thread(
+        target=app.state.documents.watch_incomplete,
+        args=(stop,),
+        name="docpilot-index",
         daemon=True,
-    ).start()
+    )
+    app.state.index_thread = thread
+    thread.start()
 
 
 def create_app(
@@ -49,8 +52,16 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-        _resume_on_startup(app)
-        yield
+        _watch_index(app)
+        try:
+            yield
+        finally:
+            stop = getattr(app.state, "index_stop", None)
+            thread = getattr(app.state, "index_thread", None)
+            if isinstance(stop, threading.Event):
+                stop.set()
+            if isinstance(thread, threading.Thread):
+                thread.join(timeout=2)
 
     app = FastAPI(title="DocPilot", lifespan=lifespan)
     login = AdminLogin(build_login_store(resolved), resolved)

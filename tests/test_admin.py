@@ -1,5 +1,6 @@
 import os
 import re
+import threading
 import time
 from io import BytesIO
 from pathlib import Path
@@ -17,7 +18,7 @@ from docpilot.documents.service import DocumentService
 from docpilot.documents.store import FileDocumentStore, MemoryDocumentStore
 from docpilot.ingest.chunk import Chunk
 from docpilot.ingest.pdftext import PageText
-from docpilot.ingest.pipeline import IngestResult
+from docpilot.ingest.pipeline import Ingestor, IngestResult, MemoryIndex
 from docpilot.main import create_app
 
 PASSWORD = "correct-horse"
@@ -800,6 +801,24 @@ class _BoomIngestor:
         del document_id
 
 
+class _FlakyIngestor:
+    def __init__(self) -> None:
+        self.calls = 0
+        self._inner = Ingestor(None, MemoryIndex())
+
+    def ingest(self, data: bytes, **kwargs: object) -> IngestResult:
+        self.calls += 1
+        if self.calls == 1:
+            raise RuntimeError("temporary")
+        return self._inner.ingest(data, **kwargs)
+
+    def delete(self, document_id: str) -> None:
+        self._inner.delete(document_id)
+
+    def clear(self) -> None:
+        self._inner.clear()
+
+
 def test_catalog_is_written_only_after_the_blob_is_confirmed(tmp_path: Path) -> None:
     store = _RecordingStore()
     service = DocumentService(store, _settings(tmp_path))
@@ -1232,6 +1251,35 @@ def test_startup_resumes_documents_left_queued_or_processing(tmp_path: Path) -> 
     actions = [event.action for event in store.audit]
     assert actions == ["processed", "failed"] or actions == ["failed", "processed"]
     assert "upload" not in actions
+
+
+def test_transient_index_failure_is_retried_until_ready(tmp_path: Path) -> None:
+    store = MemoryDocumentStore()
+    flaky = _FlakyIngestor()
+    service = DocumentService(store, _settings(tmp_path), ingestor=flaky)  # type: ignore[arg-type]
+    data = _pdf(title="2024 Flaky guide")
+    store.put_pdf("flaky", data)
+    store.put_record(_stored("flaky", "processing", title="2024 Flaky guide", source="flaky.pdf"))
+    stop = threading.Event()
+    thread = threading.Thread(
+        target=service.watch_incomplete,
+        args=(stop,),
+        kwargs={"pause": 0.01},
+    )
+    thread.start()
+    saved = store.get_record("flaky")
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline:
+        saved = store.get_record("flaky")
+        if saved is not None and saved.status == "ready":
+            break
+        time.sleep(0.02)
+    stop.set()
+    thread.join(timeout=2)
+    assert saved is not None
+    assert saved.status == "ready"
+    assert saved.error is None
+    assert flaky.calls >= 2
 
 
 def test_failed_document_can_be_retried_from_the_catalog(tmp_path: Path) -> None:
