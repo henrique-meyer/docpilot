@@ -94,6 +94,17 @@ def test_health_stays_public(tmp_path: Path) -> None:
     assert response.json() == {"status": "ok"}
 
 
+def test_admin_pages_use_the_logo_as_favicon(tmp_path: Path) -> None:
+    client = _app(tmp_path)
+    page = client.get("/admin/login")
+    assert page.status_code == 200
+    assert '<link rel="icon" href="/assets/logo.svg" type="image/svg+xml">' in page.text
+    icon = client.get("/assets/logo.svg")
+    assert icon.status_code == 200
+    assert "svg" in icon.headers["content-type"]
+    assert b"<svg" in icon.content
+
+
 def test_anonymous_admin_is_rejected(tmp_path: Path) -> None:
     client = _app(tmp_path)
     page = client.get("/admin", follow_redirects=False)
