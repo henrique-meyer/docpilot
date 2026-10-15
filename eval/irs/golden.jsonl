@@ -1,0 +1,30 @@
+{"id":"irs-587-exclusive","question":"What does the exclusive use test require for a home office?","facts":["exclusive use"],"sources":[{"doc":"Publication 587","pages":[2]}]}
+{"id":"irs-587-simplified","question":"What simplified method does Publication 587 describe for the business use of a home?","facts":["simplified method"],"sources":[{"doc":"Publication 587","pages":[1]}]}
+{"id":"irs-587-area","question":"What square-foot limit applies when figuring the simplified home office deduction?","facts":["300 square feet"],"sources":[{"doc":"Publication 587","pages":[10]}]}
+{"id":"irs-587-daycare","question":"Which providers does Publication 587 cover along with other business use of the home?","facts":["Daycare"],"sources":[{"doc":"Publication 587","pages":[1]}]}
+{"id":"irs-502-floor","question":"How much of adjusted gross income must medical and dental expenses exceed to be deductible?","facts":["7.5%"],"sources":[{"doc":"Publication 502","pages":[1]}]}
+{"id":"irs-502-schedule","question":"On which schedule are deductible medical and dental expenses claimed?","facts":["Schedule A"],"sources":[{"doc":"Publication 502","pages":[1]}]}
+{"id":"irs-502-ltc","question":"Does the medical expense publication include qualified long-term care services?","facts":["long-term care"],"sources":[{"doc":"Publication 502","pages":[2]}]}
+{"id":"irs-523-amounts","question":"What are the maximum exclusion amounts when you sell your main home?","facts":["$250,000","$500,000"],"sources":[{"doc":"Publication 523","pages":[3]}]}
+{"id":"irs-523-home","question":"Which residence does the home-sale exclusion apply to?","facts":["main home"],"sources":[{"doc":"Publication 523","pages":[3]}]}
+{"id":"irs-501-single","question":"What is the 2025 standard deduction for a single filer under 65?","facts":["$15,750"],"sources":[{"doc":"Publication 501","pages":[2]}]}
+{"id":"irs-501-hoh","question":"What is the 2025 standard deduction for a head of household under 65?","facts":["$23,625"],"sources":[{"doc":"Publication 501","pages":[2]}]}
+{"id":"irs-501-dependents","question":"What two kinds of dependents does Publication 501 distinguish?","facts":["qualifying child","qualifying relative"],"sources":[{"doc":"Publication 501","pages":[2]}]}
+{"id":"irs-590a-limit","question":"What does Publication 590-A say about the IRA contribution limit for 2025?","facts":["IRA contribution limit"],"sources":[{"doc":"Publication 590-A","pages":[1]}]}
+{"id":"irs-590a-roth","question":"Which kind of IRA does Publication 590-A cover in its Roth chapter?","facts":["Roth IRA"],"sources":[{"doc":"Publication 590-A","pages":[1]}]}
+{"id":"irs-590b-rmd","question":"Which 2024 distribution amount does Publication 590-B discuss excise-tax relief for?","facts":["required minimum"],"sources":[{"doc":"Publication 590-B","pages":[1]}]}
+{"id":"irs-590b-early","question":"What does Publication 590-B call distributions taken before the usual age?","facts":["Early Distributions"],"sources":[{"doc":"Publication 590-B","pages":[1]}]}
+{"id":"irs-590b-age","question":"What age does Publication 590-B use in the early-distribution age rule?","facts":["59"],"sources":[{"doc":"Publication 590-B","pages":[6]}]}
+{"id":"irs-970-aoc","question":"Which education credit does Publication 970 say needs a taxpayer identification number starting in 2026?","facts":["American opportunity credit"],"sources":[{"doc":"Publication 970","pages":[1]}]}
+{"id":"irs-970-llc","question":"Which education credit does Publication 970 discuss along with the American opportunity credit?","facts":["lifetime learning credit"],"sources":[{"doc":"Publication 970","pages":[2]}]}
+{"id":"irs-970-loan","question":"What education interest deduction does Publication 970 describe for 2025?","facts":["student loan interest"],"sources":[{"doc":"Publication 970","pages":[1]}]}
+{"id":"irs-334-schedule","question":"Which schedule is Publication 334 written for?","facts":["Schedule C"],"sources":[{"doc":"Publication 334","pages":[1]}]}
+{"id":"irs-334-se","question":"What employment-related tax does Publication 334 explain for a sole proprietor?","facts":["Self-Employment"],"sources":[{"doc":"Publication 334","pages":[2]}]}
+{"id":"irs-334-office","question":"When does Publication 334 say a home office is the principal place of business?","facts":["principal place of business"],"sources":[{"doc":"Publication 334","pages":[41]}]}
+{"id":"irs-17-ctc","question":"Which credit does Publication 17 mention with the credit for other dependents?","facts":["child tax credit"],"sources":[{"doc":"Publication 17","pages":[3]}]}
+{"id":"irs-17-eic","question":"Which publication number does Publication 17 give for the earned income credit?","facts":["596"],"sources":[{"doc":"Publication 17","pages":[6]}]}
+{"id":"irs-17-standard","question":"Where does Publication 17 place the standard deduction in its contents?","facts":["Standard Deduction"],"sources":[{"doc":"Publication 17","pages":[2]}]}
+{"id":"irs-home-both","question":"How do Publication 587 and Publication 334 each describe a deductible home office?","facts":["exclusive use","principal place of business"],"sources":[{"doc":"Publication 587","pages":[2]},{"doc":"Publication 334","pages":[41]}]}
+{"id":"irs-ira-both","question":"What do Publication 590-A and Publication 590-B each cover for IRAs?","facts":["Contributions","Distributions"],"sources":[{"doc":"Publication 590-A","pages":[1]},{"doc":"Publication 590-B","pages":[1]}]}
+{"id":"irs-medical-both","question":"What medical-expense floor does Publication 502 give, and where does Publication 17 place itemized deductions?","facts":["7.5%","Itemized Deductions"],"sources":[{"doc":"Publication 502","pages":[1]},{"doc":"Publication 17","pages":[2]}]}
+{"id":"irs-education-both","question":"How do Publication 970 and Publication 17 refer to education credits?","facts":["American opportunity credit","Education Credits"],"sources":[{"doc":"Publication 970","pages":[1]},{"doc":"Publication 17","pages":[6]}]}
