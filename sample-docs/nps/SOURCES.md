@@ -1,6 +1,4 @@
-# nps sample set
-
-US government works (public domain). Downloaded 2026-10-14.
+# Download catalog
 
 
 - REDW-Visitor-Guide-2026.pdf: https://nps.gov/redw/learn/news/upload/REDW-Visitor-Guide-2026.pdf (3102 KB)

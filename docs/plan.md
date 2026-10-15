@@ -2,7 +2,7 @@
 
 The whole build is due **Thursday 15 October 2026**. The eighteen stories below are one Thursday sequence in dependency order, not a Friday–Sunday split. Architecture is in [architecture.md](architecture.md).
 
-Sample PDFs live in git so an admin can upload them by hand. They are excluded from the image and are not loaded into the running app. Blob Storage for those source files is part of the deployed stack.
+The app does not load a corpus on startup. An admin uploads PDFs. Uploaded files stay out of the image. Blob Storage for those source files is part of the deployed stack.
 
 ## Definition of done
 
@@ -85,7 +85,7 @@ Blocked by DOCPILOT-1. Blocks DOCPILOT-12.
 
 Due Thursday 15 October 2026.
 
-DocPilot does not hard-code a corpus. Commit `sample-docs/{irs,nps,fema,ssa-medicare}/` with a `SOURCES.md` (title, URL, date or tax year, license note) and the sample PDFs. The PDFs stay out of the image. An admin uploads the ones to try. `make seed SET=irs` uses the same ingestion path when a local run needs the IRS set. CI evals use that set.
+DocPilot does not hard-code a corpus. The live set is whatever an admin uploads. A local seed command, when one is used, calls the same ingestion path as an admin upload. CI evals use the golden question file.
 
 Blocked by DOCPILOT-1. Blocks DOCPILOT-4.
 
@@ -101,7 +101,7 @@ Blocked by DOCPILOT-3. Live upload is also blocked by DOCPILOT-5.
 
 Due Thursday 15 October 2026.
 
-Bicep for Azure AI Search Free, Microsoft Foundry (`ais-docpilot-prod`, project `docpilot-prod`), Key Vault, Blob Storage for source PDFs, Container Apps Consumption, a $10 budget alert, and the GitHub OIDC app, in the DocPilot resource group, East US 2. Key Vault has a slot for the admin password hash. The hash value is not in git or in the template. Blob Storage is account `stdocpilotprod`, container `sources`, with Storage Blob Data Contributor on the Container App identity. Subscription, domain, and alert email stay in the gitignored parameter file.
+Bicep for Azure AI Search Free, Microsoft Foundry (`ais-docpilot-prod`, project `docpilot-prod`), Key Vault, Blob Storage for source PDFs, Container Apps Consumption, and the GitHub OIDC app, in the DocPilot resource group, East US 2. Key Vault has a slot for the admin password hash. The hash value is not in git or in the template. Blob Storage is account `stdocpilotprod`, container `sources`, with Storage Blob Data Contributor on the Container App identity. Subscription and domain stay in the gitignored parameter file.
 
 Blocks the live index use inside DOCPILOT-4, and blocks DOCPILOT-13.
 
@@ -109,7 +109,7 @@ Blocks the live index use inside DOCPILOT-4, and blocks DOCPILOT-13.
 
 Due Thursday 15 October 2026.
 
-Plain-code hybrid search, top-k, a token budget, deduplication, ordering, and a versioned prompt template. Semantic ranker stays on the free allowance and is skipped when the call fails.
+Plain-code hybrid search, top-k, a limit on retrieved context, deduplication, ordering, and a versioned prompt template. Semantic ranker stays on the free allowance and is skipped when the call fails.
 
 Blocked by DOCPILOT-1. Blocks DOCPILOT-7.
 
@@ -125,7 +125,7 @@ Blocked by DOCPILOT-6. Blocks DOCPILOT-8 and DOCPILOT-10.
 
 Due Thursday 15 October 2026.
 
-Thirty golden questions in `eval/irs/golden.jsonl` and ten red-team prompts. Other sample sets use `eval/<set>/golden.jsonl`. The IRS golden set includes questions that need more than one document. Metrics: correctness, citation accuracy, groundedness, red-team pass rate, latency, and token cost. Thresholds in config. Non-zero exit on failure. Markdown and JSON reports. CI runs the IRS set.
+Thirty golden questions and ten red-team prompts. The golden set includes questions that need more than one document. Metrics: correctness, citation accuracy, groundedness, red-team pass rate, latency, and tokens. Thresholds in config. Non-zero exit on failure. Markdown and JSON reports. CI runs that set.
 
 Blocked by DOCPILOT-7. Blocks DOCPILOT-9 and DOCPILOT-11.
 
@@ -133,7 +133,7 @@ Blocked by DOCPILOT-7. Blocks DOCPILOT-9 and DOCPILOT-11.
 
 Due Thursday 15 October 2026.
 
-GitHub Actions on pull requests: lint, typecheck, unit tests, Docker build, and the eval gate against `eval/irs/golden.jsonl`.
+GitHub Actions on pull requests: lint, typecheck, unit tests, Docker build, and the eval gate against the golden question file.
 
 Blocked by DOCPILOT-8. Blocks DOCPILOT-13.
 
@@ -141,7 +141,7 @@ Blocked by DOCPILOT-8. Blocks DOCPILOT-13.
 
 Due Thursday 15 October 2026.
 
-`POST /agent` on `agent-framework-core`. Confirm the tool-calling API from the official Python docs before coding. Do not reuse Semantic Kernel names. Tools: `search_documents`, `get_section`, `compare_documents` (what several uploaded documents say about one topic, for example home office rules in IRS Pub 587 and Pub 334). Return tool calls. Cap tool calls, enforce a timeout, and refuse out-of-scope or unsafe requests. Honor the rate limit, question-length limit, and daily token cap from DOCPILOT-7.
+`POST /agent` on `agent-framework-core`. Confirm the tool-calling API from the official Python docs before coding. Do not reuse Semantic Kernel names. Tools: `search_documents`, `get_section`, `compare_documents` (what several uploaded documents say about one topic). Return tool calls. Cap tool calls, enforce a timeout, and refuse out-of-scope or unsafe requests. Honor the rate limit, question-length limit, and daily token cap from DOCPILOT-7.
 
 Blocked by DOCPILOT-7. Blocks DOCPILOT-15.
 
@@ -181,7 +181,7 @@ Blocked by DOCPILOT-13. Blocks DOCPILOT-15.
 
 Due Thursday 15 October 2026.
 
-README with a diagram, local and Azure quickstart, eval table, design tradeoffs, cost, teardown (`az group delete --name <resource-group>`), the admin page, and a note that Cursor was used. `docs/walkthrough.md` is a 5–7 minute script. Short ADRs for Container Apps, plain-code retrieval, and Agent Framework plus the LangChain comparison. One historical pull request fails eval on purpose and is then fixed.
+README with a diagram, local and Azure quickstart, eval table, design tradeoffs, teardown (`az group delete --name <resource-group>`), the admin page, and a note that Cursor was used. `docs/walkthrough.md` is a 5–7 minute script. Short ADRs for Container Apps, plain-code retrieval, and Agent Framework plus the LangChain comparison. One historical pull request fails eval on purpose and is then fixed.
 
 Blocked by DOCPILOT-10, DOCPILOT-11, DOCPILOT-12, DOCPILOT-14, and DOCPILOT-18.
 
@@ -197,7 +197,7 @@ Blocked by DOCPILOT-7. The live password secret is also blocked by DOCPILOT-5. B
 
 Due Thursday 15 October 2026.
 
-List indexed documents: title, source, year when present, pages, chunk count, ingested date, status. Upload a PDF with a size limit and a PDF type check, or add a document by URL. The PDF is confirmed in blob storage before the catalog record is written. Ingestion then runs in the API process as a background job with status queued, processing, ready, or failed, on the same path as `make seed`. The page shows index size against the 50 MB Free-tier limit and blocks an upload that would exceed it. [DOCPILOT-19](https://nitro.atlassian.net/browse/DOCPILOT-19) is the bug where the catalog was written before that confirmation.
+List indexed documents: title, source, year when present, pages, chunk count, ingested date, status. Upload a PDF with a size limit and a PDF type check, or add a document by URL. The PDF is confirmed in blob storage before the catalog record is written. Ingestion then runs in the API process as a background job with status queued, processing, ready, or failed, on the same path as `make seed`. The page shows how much text is indexed and blocks an upload that would pass the limit configured for that deployment. [DOCPILOT-19](https://nitro.atlassian.net/browse/DOCPILOT-19) is the bug where the catalog was written before that confirmation.
 
 Blocked by DOCPILOT-16 and DOCPILOT-4. Blocks DOCPILOT-18.
 
@@ -337,7 +337,7 @@ Save Changes is the only button at the bottom. It stays disabled until a field d
 
 A control at the top of the form fills the title, the summary, and the three sample questions from the indexed documents. Generation does not save. The admin still presses Save Changes.
 
-The title states what the documents have in common. The summary says what the set contains, so a visitor knows what to ask. The three questions are ones those documents can answer. For the IRS sample set that looks like a title such as "IRS Publications for use in preparing 2025 returns", a summary of the 2025 personal-return guidance in the set, and questions such as whether a deceased person must file, whether car-loan interest is deductible, and what happens when a spouse lives outside the United States.
+The title states what the documents have in common. The summary says what the set contains, so a visitor knows what to ask. The three questions are ones those documents can answer. The wording comes from the documents that are indexed, not from a fixed corpus.
 
 The title, summary, and three questions are one catalog summary record, stored beside the catalog and cleared when the catalog is reset. Saving writes an audit event and does not put the summary text in that event. An anonymous caller cannot read or change the record.
 
@@ -423,6 +423,26 @@ The homepage disclaimer stays one paragraph with the existing line that answers 
 
 That same paragraph also says the uploaded documents are a selected set for demonstration, not a complete library on the topic. A visitor should not treat the answers as a definitive guide. The wording stays general, because the live set is whatever an admin uploads.
 
+### DOCPILOT-48 — Drop the fixed corpus and fixed limits from the docs
+
+Found Thursday 15 October 2026.
+
+Markdown still names a particular public-document set as the product's documents, and it states budgets and a fixed index-size cap.
+
+DocPilot does not ship a specific corpus. The live set is whatever an admin uploads. The markdown does not mention a fixed document set as the product's documents.
+
+The markdown also does not mention budgets or a fixed size limit. Whoever sets the deployment up chooses those limits. Application behavior stays as it is.
+
+### DOCPILOT-49 — Credit the designer and link the source
+
+Found Thursday 15 October 2026.
+
+Every page, including `/admin`, shows a small muted line under the page content, in the same style as the note that answers come from the uploaded documents.
+
+The line reads: Designed & built by Henrique Meyer · Source on GitHub
+
+Henrique Meyer links to https://www.hmeyer.dev. Source on GitHub links to https://github.com/henrique-meyer/docpilot. Both links open in a new tab. The line stays readable on a narrow window. It does not include a copyright symbol or a year, and it does not mention AI tools or agents.
+
 ## Issue index
 
 | Key | Summary | Due | URL |
@@ -474,3 +494,5 @@ That same paragraph also says the uploaded documents are a selected set for demo
 | DOCPILOT-45 | Environment setup guide with placeholder resource names | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-45 |
 | DOCPILOT-46 | Resume indexing after a restart, and retry a failed document | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-46 |
 | DOCPILOT-47 | Say the uploaded documents are a demonstration set | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-47 |
+| DOCPILOT-48 | Drop the fixed corpus and fixed limits from the docs | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-48 |
+| DOCPILOT-49 | Credit the designer and link the source | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-49 |

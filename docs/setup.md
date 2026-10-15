@@ -169,4 +169,4 @@ Run the app from the repo root and it loads `.env`. Existing environment variabl
 
 ## Documents
 
-Starting the app does not index a corpus. An admin uploads PDFs on `/admin`. The files under `sample-docs/` are there for that upload. Public `/ask` and `/agent` answer from whatever has been uploaded.
+Starting the app does not index a corpus. An admin uploads PDFs on `/admin`. Public `/ask` and `/agent` answer from whatever has been uploaded.

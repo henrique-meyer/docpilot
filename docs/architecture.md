@@ -8,7 +8,7 @@ The target date for the whole build is **Thursday 15 October 2026**. Work is one
 
 ## Who it is for
 
-A visitor asking questions about the documents an admin has uploaded. Nothing in the product hard-codes a corpus. Answers are informational only. The repo ships public-domain sample sets so a reviewer can seed a corpus locally: IRS publications, National Park Service visitor guides, FEMA / Ready.gov guides, and Social Security and Medicare handbooks, each under `sample-docs/<set>/` with a `SOURCES.md`. `make seed SET=irs` loads one set through the same ingestion path as an admin upload. The live index must stay inside 50 MB. Public question answering stays anonymous. One admin password protects `/admin`, where documents can be listed, uploaded, replaced, and deleted. There are no public accounts and no per-document access control. Kubernetes and Databricks are out of scope. AKS is only a later scaling note.
+A visitor asking questions about the documents an admin has uploaded. Nothing in the product hard-codes a corpus. Answers are informational only. Public question answering stays anonymous. One admin password protects `/admin`, where documents can be listed, uploaded, replaced, and deleted. There are no public accounts and no per-document access control. Kubernetes and Databricks are out of scope. AKS is only a later scaling note.
 
 ## Shape
 
@@ -37,7 +37,7 @@ Two question paths share one retriever:
 1. `POST /ask` runs retrieval and one grounded completion. The prompt is plain code, not a framework chain.
 2. `POST /agent` runs Microsoft Agent Framework with three tools. The response includes the tool calls so the reasoning is auditable.
 
-Ingestion is one path. Admin uploads and `make seed SET=irs` both call it. It parses PDFs, chunks them, embeds them, and upserts the index. Source files live in Blob Storage account `stdocpilotprod`, container `sources`. Compose uses Azurite with that same container name. The Container App reaches the account with its managed identity. When `AZURE_STORAGE_ACCOUNT_URL` is unset, `/admin` stores files under `DOCPILOT_DATA_DIR` (default `.data`) so documents can be uploaded before Compose is running.
+Ingestion is one path. An admin upload calls it. It parses PDFs, chunks them, embeds them, and upserts the index. Source files live in Blob Storage account `stdocpilotprod`, container `sources`. Compose uses Azurite with that same container name. The Container App reaches the account with its managed identity. When `AZURE_STORAGE_ACCOUNT_URL` is unset, `/admin` stores files under `DOCPILOT_DATA_DIR` (default `.data`) so documents can be uploaded before Compose is running.
 
 ## Repo layout
 
@@ -45,22 +45,20 @@ Ingestion is one path. Admin uploads and `make seed SET=irs` both call it. It pa
 | --- | --- |
 | `src/` | FastAPI app, retriever, prompts, agent |
 | `ingest/` | PDF download, parse, chunk, embed, upsert |
-| `eval/<set>/` | Golden questions for one sample set. CI uses `eval/irs/golden.jsonl` |
-| `eval/` | Red-team prompts, harness, LangChain baseline |
+| `eval/` | Golden questions, red-team prompts, the harness, and the LangChain baseline |
 | `infra/` | Bicep |
-| `sample-docs/<set>/` | Public-domain samples and `SOURCES.md`. PDFs are downloaded, not committed |
 | `tests/` | Unit tests. LLM and Search calls are mocked |
 | `docs/` | Architecture, Docker primer, walkthrough, decision records |
 
 ## Ingestion and the index
 
-The live corpus is whatever the admin uploads. Sample catalogs record title, URL, date or tax year, and a license note in `sample-docs/<set>/SOURCES.md`. A download script fetches large PDFs. Only public-domain or clearly reusable files are allowed. An upload that would push the index past 50 MB is refused.
+The live corpus is whatever the admin uploads. Only public-domain or clearly reusable files are allowed. An upload that would pass the index limit for that deployment is refused. Whoever sets the deployment up chooses that limit.
 
 Each chunk keeps the document title, section heading, and page number. A year is stored when the document has one. Chunks are about 500–800 tokens with overlap. Size and overlap are configuration. Chunk IDs are stable, so a re-run upserts instead of duplicating.
 
-Embeddings use `text-embedding-3-small` at **512 dimensions**. That is shorter than the model's default and keeps the Free-tier index small.
+Embeddings use `text-embedding-3-small` at **512 dimensions**.
 
-One Azure AI Search index, Free tier (50 MB, 3 indexes, $0). East US 2 had no free-tier capacity on 14 October 2026, so the service `srch-docpilot-prod` is in East US, still inside the same resource group. Every other resource is in East US 2. Fields:
+One Azure AI Search index, on the Free tier. East US 2 had no free-tier capacity on 14 October 2026, so the service `srch-docpilot-prod` is in East US, still inside the same resource group. Every other resource is in East US 2. Fields:
 
 | Field | Use |
 | --- | --- |
@@ -68,7 +66,7 @@ One Azure AI Search index, Free tier (50 MB, 3 indexes, $0). East US 2 had no fr
 | `content` | Chunk text, searchable |
 | `content_vector` | 512-dimensional vector |
 | `doc` | Document title, filterable |
-| `year` | Tax year or publication year when the document has one, filterable |
+| `year` | Year when the document has one, filterable |
 | `section` | Section heading, filterable |
 | `page` | Page number, filterable |
 
@@ -78,7 +76,7 @@ Retrieval is hybrid: keyword plus vector. Semantic ranker stays on the **free** 
 
 `POST /ask` accepts `{ "question": "..." }` and returns `{ "answer", "citations": [{ "doc", "section", "page", "snippet" }], "trace_id" }`. A year is included when the source document has one.
 
-The retriever is readable Python: hybrid search, top-k, optional semantic rerank. Context engineering is explicit: a token budget, deduplication, and a stable order. The prompt template is a versioned file in the repo. The model may answer only from that context, must cite every claim, and must say "not found in the documents" when the context does not support an answer.
+The retriever is readable Python: hybrid search, top-k, optional semantic rerank. Context engineering is explicit: a limit on how much context is sent, deduplication, and a stable order. The prompt template is a versioned file in the repo. The model may answer only from that context, must cite every claim, and must say "not found in the documents" when the context does not support an answer.
 
 `GET /health` and the OpenAPI page at `/docs` are required. A single static HTML page sends a question, shows the citations, and states that answers come from the uploaded documents and are informational only.
 
@@ -88,7 +86,7 @@ Public abuse protection applies to `/ask` and `/agent`: a per-IP rate limit, a m
 
 `/admin` and `/admin/api/*` require one admin password. The password hash is argon2id or bcrypt. It lives in Key Vault or a Container Apps secret, never in git. Login sets a signed session cookie: HttpOnly, Secure, SameSite, with an expiry. Localhost may omit Secure so Compose works over HTTP. Failed logins are rate-limited and lock out after repeated failures. Admin forms use CSRF protection. `/ask` and `/agent` stay anonymous.
 
-The page lists each indexed document: title, source, year when the document has one, pages, chunk count, ingested date, and status. An admin can upload a PDF (size limit and PDF type check) or add one by URL. Ingestion runs in the API process and reports queued, processing, ready, or failed. The page shows index size against the 50 MB Free-tier limit and refuses an upload that would exceed it.
+The page lists each indexed document: title, source, year when the document has one, pages, chunk count, ingested date, and status. An admin can upload a PDF (size limit and PDF type check) or add one by URL. Ingestion runs in the API process and reports queued, processing, ready, or failed. The page shows how much text is indexed and refuses an upload that would pass the limit configured for that deployment.
 
 Delete removes the source file and every chunk for that document. Replace indexes the new version first and removes the old chunks only after that succeeds. Every admin action writes an audit record of who, what, and when. The record does not include the password or the document body.
 
@@ -104,7 +102,7 @@ Package: `agent-framework-core`. Chat goes through `agent-framework-openai` to t
 | --- | --- |
 | `search_documents(query, filters)` | Wraps the same retriever as `/ask` |
 | `get_section(doc, section_id)` | Returns the full text of a cited section |
-| `compare_documents(topic)` | Pulls what several uploaded documents say about one topic, for example home office rules in IRS Pub 587 and Pub 334 |
+| `compare_documents(topic)` | Pulls what several uploaded documents say about one topic |
 
 Guardrails: a maximum number of tool calls per request, a timeout, and a refusal for out-of-scope or unsafe requests. The same public limits as `/ask` apply: per-IP rate limit, maximum question length, and the daily token cap.
 
@@ -114,7 +112,7 @@ A separate LangChain script, `eval/langchain_baseline.py`, answers the same gold
 
 ## Evaluation
 
-`eval/<set>/golden.jsonl` holds 30 questions with expected facts and expected documents or pages. CI runs the IRS set, `eval/irs/golden.jsonl`, and that set includes questions that need more than one document. Ten red-team prompts cover prompt injection, out-of-scope questions, system-prompt extraction, and invented citations. Expected behavior is to refuse, or to answer only from the documents.
+The golden file holds 30 questions with expected facts and expected documents or pages. CI runs that set, and it includes questions that need more than one document. Ten red-team prompts cover prompt injection, out-of-scope questions, system-prompt extraction, and invented citations. Expected behavior is to refuse, or to answer only from the documents.
 
 Metrics: answer correctness (LLM-as-judge plus key-fact match), citation accuracy, groundedness, red-team pass rate, latency, and token cost. Thresholds live in config (starting point: correctness at least 0.8, citation accuracy at least 0.9, red-team 10/10). The harness exits non-zero when a threshold fails. `make eval` runs it locally. CI runs it on pull requests and publishes a Markdown and JSON report.
 
@@ -124,7 +122,7 @@ One pull request in history must show a deliberate regression (a broken prompt o
 
 OpenTelemetry spans cover the API, retrieval, LLM calls, and agent tool calls. Spans carry token counts and latency. Logs are structured JSON and include `trace_id`. Secrets are never logged. Prompt bodies are not logged at info level.
 
-Locally, Jaeger runs in Docker Compose. In Azure, traces export to Application Insights with a small daily ingestion cap so logging cannot quietly spend the budget. If that cap still threatens the $10 alert, tracing stays local-only and the choice is written down.
+Locally, Jaeger runs in Docker Compose. In Azure, traces export to Application Insights with a daily ingestion cap. Tracing can stay local-only, and that choice is written down.
 
 ## Engineering
 
@@ -144,7 +142,7 @@ Sign-in from GitHub to Azure uses OIDC federated credentials. No cloud keys are 
 
 Resource group: chosen at deploy time, East US 2. The name is kept in the gitignored parameter file. Do not reuse an existing App Service plan.
 
-Infrastructure is Bicep under `infra/`. The estate is Azure-only, and `az deployment group what-if` does not need a remote state account or the cost of a Terraform backend. Names look like `ais-docpilot-prod`, `srch-docpilot-prod`, `kv-docpilot-prod`, `ca-docpilot-prod`. The Foundry project is `docpilot-prod`. The storage account is `stdocpilotprod` because a storage account name cannot contain hyphens. The container is `sources`.
+Infrastructure is Bicep under `infra/`. The estate is Azure-only, and `az deployment group what-if` does not need a remote state account. Names look like `ais-docpilot-prod`, `srch-docpilot-prod`, `kv-docpilot-prod`, `ca-docpilot-prod`. The Foundry project is `docpilot-prod`. The storage account is `stdocpilotprod` because a storage account name cannot contain hyphens. The container is `sources`.
 
 One Azure environment, `prod`, on the custom domain supplied at deploy time. Local Compose is dev. A second Azure environment and a dev subdomain wait until they are worth the extra surface. The Container App uses the Consumption plan and scales to zero replicas.
 
@@ -157,13 +155,13 @@ Custom domain: free managed certificate, HTTPS only. The deploy step prints two 
 
 Binding the domain waits until the owner confirms those records exist.
 
-A $10 budget alert is attached to the resource group. Teardown is:
+Teardown is:
 
 ```bash
 az group delete --name <resource-group>
 ```
 
-Spend was approved on 14 October 2026. The subscription and resource group are deploy-time values, kept outside git. Existing accounts in other resource groups are not reused. Subscription quota is checked at apply time.
+The subscription and resource group are deploy-time values, kept outside git. Existing accounts in other resource groups are not reused. Subscription quota is checked at apply time.
 
 ### Region check
 
@@ -180,30 +178,12 @@ Checked against Microsoft's [Foundry region matrix](https://learn.microsoft.com/
 
 Chat and the LLM judge both use `gpt-6.1-sol` so there is only one chat deployment. Deployment type is **Data Zone Standard (US)** so prompts and responses stay in the United States. Embeddings use the same deployment type at 512 dimensions.
 
-### Cost
-
-Prices below are published list rates, not an invoice. Confirm them on the [Foundry model pricing page](https://azure.microsoft.com/en-us/pricing/details/azure-openai/) before apply. Data Zone Standard `gpt-6.1-sol` in the US is $2.20 per 1M input tokens and $11 per 1M output tokens for short context. `text-embedding-3-small` is about $0.022 per 1M tokens.
-
-| Item | Expectation |
-| --- | --- |
-| Azure AI Search Free | $0. One service per subscription, 50 MB, 3 indexes |
-| Embedding the corpus | A sample set that fits the 50 MB index is a small embedding job, on the order of cents |
-| A Friday demo of questions and judging on `gpt-6.1-sol` | A few dollars if calls are not looped. The daily token cap is what stops anonymous traffic after the demo |
-| Container Apps Consumption, scale to zero | $0 while idle. A short demo fits the monthly grant of 180,000 vCPU-seconds, 360,000 GiB-seconds, and 2 million requests |
-| GitHub Container Registry | $0 for this public or small private image. Azure Container Registry Basic is about $5 per month even when idle, so it is not used |
-| Blob Storage | Cents for the source PDFs on locally redundant storage. Azurite in Compose is $0 |
-| Key Vault operations | Cents |
-| Application Insights | The risk item. A daily cap keeps ingestion inside the budget. The $10 resource-group alert is the stop |
-| Managed certificate and budget alert | $0 |
-
-The product target is roughly $1–5 of total spend, with the $10 alert as the ceiling.
-
 ## Decisions
 
 | Topic | Choice |
 | --- | --- |
 | Users | A visitor over whatever documents an admin uploaded. Public Q&A is anonymous. One admin password. Answers are informational only |
-| Corpus | No hard-coded set. Samples live in `sample-docs/<set>/`. `make seed SET=irs` uses the admin ingest path. CI evals use the IRS golden set |
+| Corpus | No hard-coded set. The live corpus is whatever an admin uploads |
 | Admin | Password hash in Key Vault, session cookie, CSRF, blob for source PDFs, in-process ingest jobs, audit log |
 | Agent stack | `agent-framework-core`, not Semantic Kernel |
 | Chat and judge | `gpt-6.1-sol` `2026-09-29`, Data Zone Standard (US) |

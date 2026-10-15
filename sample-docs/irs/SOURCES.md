@@ -1,6 +1,4 @@
-# IRS sample set
-
-US government works (public domain). Downloaded 2026-10-14 from irs.gov.
+# Download catalog
 
 - p17.pdf: https://www.irs.gov/pub/irs-pdf/p17.pdf (3016 KB)
 - p501.pdf: https://www.irs.gov/pub/irs-pdf/p501.pdf (1517 KB)
