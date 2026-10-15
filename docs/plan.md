@@ -397,6 +397,14 @@ Found Thursday 15 October 2026.
 
 Pressing Enter in the ask-about-uploaded-documents textarea submits the question, the same as pressing the Ask button. Ctrl+Enter inserts a new line at the cursor.
 
+### DOCPILOT-45 — Environment setup guide with placeholder resource names
+
+Found Thursday 15 October 2026.
+
+Setup instructions a reader can follow to reproduce the resources DocPilot needs, using their own names. Placeholder names only. Exact region, SKU, and configuration for each resource. Key Vault secrets, each with the environment variable it maps to and what the value is for. Then how to copy `.env.example` to `.env` and fill it with the reader's resource names and those secret values.
+
+Sample PDFs are not part of the running application. An admin uploads them by hand. The guide does not treat seeding as environment setup, and it does not include a deploy command. The README points at the guide and does not list this environment's resource names.
+
 ## Issue index
 
 | Key | Summary | Due | URL |
@@ -445,3 +453,4 @@ Pressing Enter in the ask-about-uploaded-documents textarea submits the question
 | DOCPILOT-42 | Make the catalog table full width | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-42 |
 | DOCPILOT-43 | Show timestamps in the user's timezone | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-43 |
 | DOCPILOT-44 | Submit the ask box with Enter | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-44 |
+| DOCPILOT-45 | Environment setup guide with placeholder resource names | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-45 |
