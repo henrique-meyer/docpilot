@@ -44,7 +44,9 @@ def test_seed_uses_the_upload_path_and_skips_ready_files(tmp_path: Path) -> None
     assert record.title == "2025 Visitor guide"
     assert record.year == "2025"
     assert record.status == "ready"
-    assert service.list_audit()[0].action == "upload"
+    actions = [event.action for event in service.list_audit()]
+    assert actions[0] == "processed"
+    assert "upload" in actions
     again, skipped_again = seed_set(tmp_path / "sample-docs", "irs", service)
     assert again == []
     assert skipped_again == ["guide.pdf"]

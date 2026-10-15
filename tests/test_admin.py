@@ -767,6 +767,7 @@ def test_catalog_is_written_only_after_the_blob_is_confirmed(tmp_path: Path) -> 
         saved = store.get_record(document_id)
         assert saved is not None
         assert saved.status == "processing"
+        assert [event.action for event in store.audit] == ["upload"]
         seen["status"] = saved.status
         return IngestResult(pages=1, chunk_count=0, index_bytes=1)
 
@@ -780,6 +781,7 @@ def test_catalog_is_written_only_after_the_blob_is_confirmed(tmp_path: Path) -> 
     finished = store.get_record(record.id)
     assert finished is not None
     assert finished.status == "ready"
+    assert [event.action for event in store.audit] == ["upload", "processed"]
 
 
 def test_failed_blob_confirmation_leaves_no_catalog_record(tmp_path: Path) -> None:
@@ -803,3 +805,68 @@ def test_failed_ingest_keeps_the_stored_pdf(tmp_path: Path) -> None:
     assert saved is not None
     assert saved.status == "failed"
     assert store.pdfs[record.id] == data
+    assert [event.action for event in store.audit] == ["upload", "failed"]
+
+
+def test_catalog_audit_and_usage_load_on_their_own(tmp_path: Path) -> None:
+    store = MemoryDocumentStore()
+    client = _app(tmp_path, store)
+    csrf = _sign_in(client)
+    uploaded = client.post(
+        "/admin/api/documents",
+        data={"csrf": csrf},
+        files={"file": ("guide.pdf", _pdf(title="2026 Visitor guide"), "application/pdf")},
+        follow_redirects=False,
+    )
+    assert uploaded.status_code == 303
+    page = client.get("/admin")
+    assert 'id="usage-panel"' in page.text
+    assert 'id="catalog-panel"' in page.text
+    assert 'id="audit-panel"' in page.text
+    assert "Loading…" in page.text
+    assert "No documents yet." not in page.text
+    assert "No admin actions yet." not in page.text
+    assert "Source files stored:" not in page.text
+    assert "2026 Visitor guide" not in page.text
+    assert "DOMParser" not in page.text
+    assert "/admin/api/usage" in page.text
+    assert "/admin/api/catalog" in page.text
+    assert "/admin/api/audit" in page.text
+    assert "2000" in page.text
+    assert "30000" in page.text
+    assert ".status-queued, #catalog-panel .status-processing" in page.text
+
+    usage = client.get("/admin/api/usage")
+    catalog = client.get("/admin/api/catalog")
+    audit = client.get("/admin/api/audit")
+    assert usage.status_code == 200
+    assert "extracted text" in usage.text
+    assert "Source files stored:" in usage.text
+    assert 'aria-label="Extracted text toward the index limit"' in usage.text
+    assert catalog.status_code == 200
+    assert "2026 Visitor guide" in catalog.text
+    assert "status-ready" in catalog.text
+    assert 'name="csrf"' in catalog.text
+    assert audit.status_code == 200
+    assert ">upload<" in audit.text
+    assert ">processed<" in audit.text
+    assert "2026 Visitor guide" in audit.text
+    assert "Replace" not in catalog.text
+    assert "<th>Year</th>" not in catalog.text
+    assert "nowrap" in catalog.text
+    assert 'aria-label="Delete"' in catalog.text
+    assert 'id="delete-confirm"' in page.text
+    assert ">Yes<" in page.text
+    assert ">No<" in page.text
+
+    record = store.list_records()[0]
+    record.status = "processing"
+    processing = client.get("/admin/api/catalog")
+    assert "status-processing" in processing.text
+    quiet = client.get("/admin/api/usage")
+    assert "Source files stored:" in quiet.text
+
+    outsider = TestClient(client.app)
+    assert outsider.get("/admin/api/usage").status_code == 401
+    assert outsider.get("/admin/api/catalog").status_code == 401
+    assert outsider.get("/admin/api/audit").status_code == 401

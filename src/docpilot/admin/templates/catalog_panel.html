@@ -1,0 +1,51 @@
+{% if documents %}
+<table>
+  <thead>
+    <tr>
+      <th>Title</th>
+      <th>Source</th>
+      <th class="nowrap">Pages</th>
+      <th class="nowrap">Chunks</th>
+      <th class="nowrap">Text</th>
+      <th class="nowrap">Stored</th>
+      <th>Status</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for doc in documents %}
+    <tr>
+      <td>{{ doc.title or "—" }}{% if doc.error %}<br><span class="banner error">{{ doc.error }}</span>{% endif %}</td>
+      <td>
+        {% if doc.source.startswith("http://") or doc.source.startswith("https://") %}
+        <a href="{{ doc.source }}">{{ doc.source }}</a>
+        {% else %}
+        {{ doc.source }}
+        {% endif %}
+      </td>
+      <td class="nowrap">{{ doc.pages }}</td>
+      <td class="nowrap">{{ doc.chunk_count }}</td>
+      <td class="nowrap">{{ doc.index_bytes | bytes }}</td>
+      <td class="nowrap">{{ doc.ingested_at or "—" }}</td>
+      <td><span class="status status-{{ doc.status }}">{{ doc.status }}</span></td>
+      <td class="actions">
+        <form method="post" action="/admin/api/documents/{{ doc.id }}/delete">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <button type="submit" class="icon" aria-label="Delete">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M4 7h16"/>
+              <path d="M9 7V5h6v2"/>
+              <path d="M7 7l1 13h8l1-13"/>
+              <path d="M10 11v6"/>
+              <path d="M14 11v6"/>
+            </svg>
+          </button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p>No documents yet.</p>
+{% endif %}

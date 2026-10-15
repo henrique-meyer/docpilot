@@ -12,13 +12,7 @@
   <p>A PDF is saved to storage and added to the catalog only after that upload is confirmed. Chunking and indexing run after that. The bar uses extracted text size against the 50 MB Free-tier limit.</p>
   <div id="page-banner" class="banner {% if error %}error{% else %}notice{% endif %}" {% if not error and not notice %}hidden{% endif %} data-autodismiss>{{ error or notice }}</div>
 
-  <div id="usage-panel" class="card">
-    <strong>{{ index_bytes | bytes }}</strong> of {{ index_limit | bytes }} extracted text
-    <div class="meter" role="meter" aria-valuemin="0" aria-valuemax="{{ index_limit }}" aria-valuenow="{{ index_bytes }}" aria-label="Extracted text toward the index limit">
-      <span style="width: {{ percent }}%"></span>
-    </div>
-    <p>Source files stored: {{ source_bytes | bytes }}</p>
-  </div>
+  <div id="usage-panel" class="card" aria-busy="true"><p>Loading…</p></div>
 
   <h2>Upload a PDF</h2>
   <form id="upload-form" class="dropzone" method="post" action="/admin/api/documents" enctype="multipart/form-data">
@@ -71,82 +65,14 @@
     })();
   </script>
 
-  <div id="catalog-panel">
   <h2>Catalog</h2>
-  {% if documents %}
-  <table>
-    <thead>
-      <tr>
-        <th>Title</th>
-        <th>Source</th>
-        <th>Year</th>
-        <th>Pages</th>
-        <th>Chunks</th>
-        <th>Text</th>
-        <th>Stored</th>
-        <th>Status</th>
-        <th></th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for doc in documents %}
-      <tr>
-        <td>{{ doc.title or "—" }}{% if doc.error %}<br><span class="banner error">{{ doc.error }}</span>{% endif %}</td>
-        <td>
-          {% if doc.source.startswith("http://") or doc.source.startswith("https://") %}
-          <a href="{{ doc.source }}">{{ doc.source }}</a>
-          {% else %}
-          {{ doc.source }}
-          {% endif %}
-        </td>
-        <td>{{ doc.year or "—" }}</td>
-        <td>{{ doc.pages }}</td>
-        <td>{{ doc.chunk_count }}</td>
-        <td>{{ doc.index_bytes | bytes }}</td>
-        <td>{{ doc.ingested_at or "—" }}</td>
-        <td><span class="status status-{{ doc.status }}">{{ doc.status }}</span></td>
-        <td class="actions">
-          <form method="post" action="/admin/api/documents/{{ doc.id }}/replace" enctype="multipart/form-data">
-            <input type="hidden" name="csrf" value="{{ csrf }}">
-            <label>Replace PDF
-              <input type="file" name="file" accept="application/pdf,.pdf" required>
-            </label>
-            <button type="submit">Replace</button>
-          </form>
-          <form method="post" action="/admin/api/documents/{{ doc.id }}/delete">
-            <input type="hidden" name="csrf" value="{{ csrf }}">
-            <button class="danger" type="submit">Delete</button>
-          </form>
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  {% else %}
-  <p>No documents yet.</p>
-  {% endif %}
+  <div id="catalog-panel" aria-busy="true"><p>Loading…</p></div>
+  <div id="delete-confirm" class="confirm" hidden>
+    <p id="delete-question">Delete this document?</p>
+    <button type="button" id="delete-yes">Yes</button>
+    <button type="button" class="quiet" id="delete-no">No</button>
   </div>
 
-  <div id="audit-panel">
   <h2>Audit</h2>
-  {% if audit %}
-  <table>
-    <thead>
-      <tr><th>When</th><th>Who</th><th>Action</th><th>Detail</th></tr>
-    </thead>
-    <tbody>
-      {% for event in audit %}
-      <tr>
-        <td>{{ event.at }}</td>
-        <td>{{ event.actor }}</td>
-        <td>{{ event.action }}</td>
-        <td>{{ event.detail or "—" }}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  {% else %}
-  <p>No admin actions yet.</p>
-  {% endif %}
-  </div>
+  <div id="audit-panel" aria-busy="true"><p>Loading…</p></div>
 {% endblock %}

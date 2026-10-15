@@ -1,0 +1,5 @@
+<strong>{{ index_bytes | bytes }}</strong> of {{ index_limit | bytes }} extracted text
+<div class="meter" role="meter" aria-valuemin="0" aria-valuemax="{{ index_limit }}" aria-valuenow="{{ index_bytes }}" aria-label="Extracted text toward the index limit">
+  <span style="width: {{ percent }}%"></span>
+</div>
+<p>Source files stored: {{ source_bytes | bytes }}</p>

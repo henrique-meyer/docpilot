@@ -360,18 +360,10 @@ def admin_page(request: Request) -> Response:
     if denied is not None:
         return denied
     session = read_session(request, _settings(request))
-    service = _service(request)
     notice, error, present = _take_flash(request)
-    documents = service.list_documents()
     page = _render(
         "admin.html",
         csrf=session.csrf if session else "",
-        documents=documents,
-        audit=service.list_audit(),
-        index_bytes=service.index_bytes_used(),
-        source_bytes=service.source_bytes_used(),
-        index_limit=service.settings.index_limit_bytes,
-        percent=_percent(service.index_bytes_used(), service.settings.index_limit_bytes),
         error=error,
         notice=notice,
         signed_in=True,
@@ -379,6 +371,44 @@ def admin_page(request: Request) -> Response:
     if present:
         clear_flash(page, _settings(request))
     return page
+
+
+@router.get("/admin/api/usage")
+def usage_panel(request: Request) -> Response:
+    denied = _require_admin(request)
+    if denied is not None:
+        return denied
+    service = _service(request)
+    used = service.index_bytes_used()
+    limit = service.settings.index_limit_bytes
+    return _render(
+        "usage_panel.html",
+        index_bytes=used,
+        source_bytes=service.source_bytes_used(),
+        index_limit=limit,
+        percent=_percent(used, limit),
+    )
+
+
+@router.get("/admin/api/catalog")
+def catalog_panel(request: Request) -> Response:
+    denied = _require_admin(request)
+    if denied is not None:
+        return denied
+    session = read_session(request, _settings(request))
+    return _render(
+        "catalog_panel.html",
+        documents=_service(request).list_documents(),
+        csrf=session.csrf if session else "",
+    )
+
+
+@router.get("/admin/api/audit")
+def audit_panel(request: Request) -> Response:
+    denied = _require_admin(request)
+    if denied is not None:
+        return denied
+    return _render("audit_panel.html", audit=_service(request).list_audit())
 
 
 @router.get("/admin/api/documents")

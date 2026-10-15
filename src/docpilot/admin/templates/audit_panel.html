@@ -1,0 +1,19 @@
+{% if audit %}
+<table>
+  <thead>
+    <tr><th>When</th><th>Who</th><th>Action</th><th>Detail</th></tr>
+  </thead>
+  <tbody>
+    {% for event in audit %}
+    <tr>
+      <td>{{ event.at }}</td>
+      <td>{{ event.actor }}</td>
+      <td>{{ event.action }}</td>
+      <td>{{ event.detail or "—" }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p>No admin actions yet.</p>
+{% endif %}

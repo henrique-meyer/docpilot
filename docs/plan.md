@@ -303,6 +303,58 @@ Every admin form submits with an async request. The browser does not post a form
 
 The drop zone says Uploading only while the file is being sent, and a progress bar advances during that send so the control does not look frozen. Once the file has been sent, the bar keeps moving and the message changes to show that the file was received and work is still running, until the response arrives. A success clears the drop zone. The catalog, usage meter, and audit log update in place, including while a document is queued or processing. Notices and errors on the page disappear after a few seconds. The documents page does not reload itself to keep a notice on screen.
 
+### DOCPILOT-34 — Load catalog, audit, and usage on their own
+
+Found Thursday 15 October 2026.
+
+The documents page renders its shell first. The catalog, the audit log, and the usage numbers (extracted text and source files stored) each load from their own request, including the first visit. One panel does not wait on another. The page no longer refreshes those panels by fetching the whole documents page and swapping the HTML.
+
+Blocks DOCPILOT-35 and DOCPILOT-36.
+
+### DOCPILOT-35 — Refresh catalog, audit, and usage while indexing
+
+Found Thursday 15 October 2026.
+
+While any document is queued or processing, the catalog, the audit log, and the usage numbers refresh every few seconds. Status, pages, chunks, errors, new audit rows, extracted text, and source-file totals change without a reload. When nothing is queued or processing, this fast refresh stops. Each panel is refreshed from its own read.
+
+Blocked by DOCPILOT-34. Blocks DOCPILOT-36.
+
+### DOCPILOT-36 — Refresh the documents panels every 30 seconds
+
+Found Thursday 15 October 2026.
+
+When the fast indexing refresh is not running, the catalog, the audit log, and the usage numbers still refresh every 30 seconds. A change from another session, or indexing that finished between visits, shows up without a manual reload. Each panel is refreshed from its own read.
+
+Blocked by DOCPILOT-34 and DOCPILOT-35.
+
+### DOCPILOT-37 — Add a Catalog Summary on the admin documents page
+
+Found Thursday 15 October 2026.
+
+Under the catalog, a Catalog Summary section has a Title field, a Summary field, and Sample questions as three text fields. They load blank until an admin saves them.
+
+Save Changes is the only button at the bottom. It stays disabled until a field differs from the last saved values. It submits asynchronously, stays on the page, tells the admin the summary was saved, and that notice disappears after a moment. The address bar stays clean.
+
+A control at the top of the form fills the title, the summary, and the three sample questions from the indexed documents. Generation does not save. The admin still presses Save Changes.
+
+The title states what the documents have in common. The summary says what the set contains, so a visitor knows what to ask. The three questions are ones those documents can answer. For the IRS sample set that looks like a title such as "IRS Publications for use in preparing 2025 returns", a summary of the 2025 personal-return guidance in the set, and questions such as whether a deceased person must file, whether car-loan interest is deductible, and what happens when a spouse lives outside the United States.
+
+The title, summary, and three questions are one catalog summary record, stored beside the catalog and cleared when the catalog is reset. Saving writes an audit event and does not put the summary text in that event. An anonymous caller cannot read or change the record.
+
+Auto-complete reads the text of ready documents, asks the chat model for the title, the summary, and three questions those documents can answer, and fills the form. It does not save.
+
+### DOCPILOT-38 — Compact the catalog table
+
+Found Thursday 15 October 2026.
+
+The catalog table drops Replace. An admin who wants a new PDF deletes the row and uploads another file. The Year column is gone. Year stays on the stored record and is not shown in the table. Title stays. Pages, chunks, text, and stored each stay on one line. Delete is a trash icon. Choosing it asks Yes or No on the page. Yes sends the delete asynchronously and stays on `/admin`. No closes the question and does not delete.
+
+### DOCPILOT-39 — Record upload and processing as separate audit events
+
+Found Thursday 15 October 2026.
+
+When a PDF is stored and its catalog row exists, write an audit event for the upload. Indexing has not finished yet. When indexing finishes, write a separate audit event: processed when the status becomes ready, or failed when it becomes failed. The upload line stays. A file that is still processing, or that never finishes, still has its upload line.
+
 ## Issue index
 
 | Key | Summary | Due | URL |
@@ -340,3 +392,9 @@ The drop zone says Uploading only while the file is being sent, and a progress b
 | DOCPILOT-31 | Name the admin header and simplify the login page | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-31 |
 | DOCPILOT-32 | Reject an upload that would pass the index limit | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-32 |
 | DOCPILOT-33 | Show upload progress and clear page messages | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-33 |
+| DOCPILOT-34 | Load catalog, audit, and usage on their own | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-34 |
+| DOCPILOT-35 | Refresh catalog, audit, and usage while indexing | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-35 |
+| DOCPILOT-36 | Refresh the documents panels every 30 seconds | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-36 |
+| DOCPILOT-37 | Add a Catalog Summary on the admin documents page | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-37 |
+| DOCPILOT-38 | Compact the catalog table | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-38 |
+| DOCPILOT-39 | Record upload and processing as separate audit events | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-39 |
