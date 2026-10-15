@@ -25,6 +25,7 @@ from docpilot.config import Settings
 from docpilot.documents.errors import MESSAGES, DocumentError
 from docpilot.documents.fetch import download_pdf
 from docpilot.documents.service import DocumentService
+from docpilot.documents.summary import propose_summary
 
 router = APIRouter()
 _TEMPLATES = Environment(
@@ -39,6 +40,7 @@ NOTICES = {
     "reset": "Catalog, documents, and the audit log were deleted.",
     "logged_out": "Signed out.",
     "password_changed": "Password updated.",
+    "summary_saved": "Catalog summary saved.",
 }
 
 
@@ -367,10 +369,74 @@ def admin_page(request: Request) -> Response:
         error=error,
         notice=notice,
         signed_in=True,
+        summary=_service(request).get_summary(),
     )
     if present:
         clear_flash(page, _settings(request))
     return page
+
+
+@router.post("/admin/api/catalog-summary")
+def save_catalog_summary(
+    request: Request,
+    csrf: str = Form(""),
+    title: str = Form(""),
+    summary: str = Form(""),
+    question_1: str = Form(""),
+    question_2: str = Form(""),
+    question_3: str = Form(""),
+) -> Response:
+    denied = _require_admin(request)
+    if denied is not None:
+        return denied
+    denied = _require_csrf(request, csrf)
+    if denied is not None:
+        return denied
+    try:
+        saved = _service(request).save_summary(title, summary, (question_1, question_2, question_3))
+    except DocumentError as exc:
+        return _error_response(request, exc.code, 400)
+    if not _wants_json(request):
+        return _redirect(request, "/admin", notice="summary_saved")
+    return _no_store(
+        JSONResponse(
+            {
+                "ok": True,
+                "message": NOTICES["summary_saved"],
+                "title": saved.title,
+                "summary": saved.summary,
+                "questions": list(saved.questions),
+            }
+        )
+    )
+
+
+@router.post("/admin/api/catalog-summary/draft")
+def draft_catalog_summary(request: Request, csrf: str = Form("")) -> Response:
+    denied = _require_admin(request)
+    if denied is not None:
+        return denied
+    denied = _require_csrf(request, csrf)
+    if denied is not None:
+        return denied
+    asker = getattr(request.app.state, "asker", None)
+    chat = getattr(asker, "chat", None)
+    if chat is None:
+        return _json_error("no_model", 503)
+    try:
+        drafted = propose_summary(_service(request), chat)
+    except DocumentError as exc:
+        return _json_error(exc.code, 400)
+    return _no_store(
+        JSONResponse(
+            {
+                "ok": True,
+                "title": drafted.title,
+                "summary": drafted.summary,
+                "questions": list(drafted.questions),
+            }
+        )
+    )
 
 
 @router.get("/admin/api/usage")

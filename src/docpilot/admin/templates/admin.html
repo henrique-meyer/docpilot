@@ -73,6 +73,31 @@
     <button type="button" class="quiet" id="delete-no">No</button>
   </div>
 
+  <h2>Catalog Summary</h2>
+  <form id="catalog-summary-form" method="post" action="/admin/api/catalog-summary">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <button type="button" class="quiet" id="catalog-summary-draft">Auto-complete with AI</button>
+    <label>Title
+      <input type="text" name="title" value="{{ summary.title }}" maxlength="200">
+    </label>
+    <label>Summary
+      <textarea name="summary" maxlength="2000">{{ summary.summary }}</textarea>
+    </label>
+    <fieldset>
+      <legend>Sample questions</legend>
+      <label>Question 1
+        <input type="text" name="question_1" value="{{ summary.questions[0] }}" maxlength="300">
+      </label>
+      <label>Question 2
+        <input type="text" name="question_2" value="{{ summary.questions[1] }}" maxlength="300">
+      </label>
+      <label>Question 3
+        <input type="text" name="question_3" value="{{ summary.questions[2] }}" maxlength="300">
+      </label>
+    </fieldset>
+    <button type="submit" id="catalog-summary-save" disabled>Save Changes</button>
+  </form>
+
   <h2>Audit</h2>
   <div id="audit-panel" aria-busy="true"><p>Loading…</p></div>
 {% endblock %}
