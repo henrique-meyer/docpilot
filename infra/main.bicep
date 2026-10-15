@@ -72,6 +72,10 @@ resource search 'Microsoft.Search/searchServices@2023-11-01' = {
     hostingMode: 'default'
     publicNetworkAccess: 'enabled'
     semanticSearch: 'free'
+    // API keys alone reject the container app's managed identity with 403.
+    authOptions: {
+      aadOrApiKey: {}
+    }
   }
 }
 
