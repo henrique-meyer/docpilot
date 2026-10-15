@@ -1,7 +1,7 @@
 """Admin pages and /admin/api document routes."""
 
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, TypeVar
 
 from fastapi import APIRouter, BackgroundTasks, File, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
@@ -80,7 +80,10 @@ def _wants_json(request: Request) -> bool:
     return "application/json" in request.headers.get("accept", "")
 
 
-def _no_store(response: Response) -> Response:
+ResponseT = TypeVar("ResponseT", bound=Response)
+
+
+def _no_store(response: ResponseT) -> ResponseT:
     response.headers["Cache-Control"] = "no-store"
     return response
 
