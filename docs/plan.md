@@ -289,6 +289,12 @@ Found Thursday 15 October 2026.
 
 The admin header says DocPilot Admin. The login page heading is Login. The line under it is Manage source documents.
 
+### DOCPILOT-32 — Reject an upload that would pass the index limit
+
+Found Thursday 15 October 2026.
+
+File upload and add-by-URL share one processing path. During that request, after the PDF is stored, the text is extracted and compared with the index limit. If the document would pass the limit, the stored PDF and its catalog record are deleted and the browser gets an error. Embeddings and the search upsert do not run. A later indexing failure still keeps the stored PDF.
+
 ## Issue index
 
 | Key | Summary | Due | URL |
@@ -324,3 +330,4 @@ The admin header says DocPilot Admin. The login page heading is Login. The line 
 | DOCPILOT-29 | Add an Admin menu to the header | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-29 |
 | DOCPILOT-30 | Add Cancel to the change-password page | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-30 |
 | DOCPILOT-31 | Name the admin header and simplify the login page | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-31 |
+| DOCPILOT-32 | Reject an upload that would pass the index limit | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-32 |

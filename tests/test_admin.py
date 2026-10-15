@@ -417,18 +417,43 @@ def test_upload_stops_at_the_index_limit(tmp_path: Path, monkeypatch: MonkeyPatc
     )
     assert first.status_code == 200
     csrf = _csrf(first.text)
-    client.post(
+    second = client.post(
         "/admin/api/documents",
         data={"csrf": csrf},
         files={"file": ("b.pdf", _pdf(title="Second"), "application/pdf")},
         follow_redirects=True,
     )
+    assert second.status_code == 200
+    assert "pass the 50 MB index limit" in second.text
     documents = client.get("/admin/api/documents").json()["documents"]
-    statuses = {item["title"]: item["status"] for item in documents}
-    assert statuses["First"] == "ready"
-    assert statuses["Second"] == "failed"
-    failed = next(item for item in documents if item["title"] == "Second")
-    assert store.pdfs[failed["id"]].startswith(b"%PDF-")
+    assert [item["title"] for item in documents] == ["First"]
+    assert documents[0]["status"] == "ready"
+    assert len(store.pdfs) == 1
+    csrf = _csrf(client.get("/admin").text)
+    rejected = client.post(
+        "/admin/api/documents",
+        data={"csrf": csrf},
+        files={"file": ("c.pdf", _pdf(title="Third"), "application/pdf")},
+        headers={"Accept": "application/json"},
+    )
+    assert rejected.status_code == 400
+    assert rejected.json()["error"] == "over_capacity"
+    assert len(store.list_records()) == 1
+    assert len(store.pdfs) == 1
+
+    def url_pdf(_url: str, _limit: int) -> bytes:
+        return _pdf(title="From URL")
+
+    monkeypatch.setattr("docpilot.admin.routes.download_pdf", url_pdf)
+    by_url = client.post(
+        "/admin/api/documents/url",
+        data={"csrf": csrf, "url": "https://example.gov/guide.pdf"},
+        headers={"Accept": "application/json"},
+    )
+    assert by_url.status_code == 400
+    assert by_url.json()["error"] == "over_capacity"
+    assert len(store.list_records()) == 1
+    assert len(store.pdfs) == 1
 
 
 def test_private_urls_are_refused(tmp_path: Path) -> None:
