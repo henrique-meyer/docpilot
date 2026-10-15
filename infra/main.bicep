@@ -301,6 +301,7 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
 
 var openAiUserRole = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd')
 var searchDataRole = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '8ebe5a00-799e-43f5-93ac-243d3dce84a7')
+var searchServiceRole = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '7ca78c8a-450e-4526-93fa-f21fdbf7b4d7')
 var keyVaultSecretsRole = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '4633458b-17de-408a-b874-0445c86b69e6')
 var blobDataRole = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'ba92f5b4-2d11-453d-a403-e96b0029c9fe')
 
@@ -319,6 +320,16 @@ resource searchRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   scope: search
   properties: {
     roleDefinitionId: searchDataRole
+    principalId: containerApp.identity.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+resource searchServiceRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(search.id, containerApp.id, searchServiceRole)
+  scope: search
+  properties: {
+    roleDefinitionId: searchServiceRole
     principalId: containerApp.identity.principalId
     principalType: 'ServicePrincipal'
   }
