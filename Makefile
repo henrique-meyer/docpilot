@@ -1,4 +1,4 @@
-.PHONY: eval baseline seed
+.PHONY: eval baseline seed fetch
 
 eval:
 	python -m docpilot.eval --set irs --report-dir eval/reports
@@ -8,3 +8,6 @@ baseline:
 
 seed:
 	python -m docpilot.seed --set $(SET)
+
+fetch:
+	python -m docpilot.seed.download --set $(SET)

@@ -51,6 +51,26 @@ def test_seed_uses_the_upload_path_and_skips_ready_files(tmp_path: Path) -> None
     assert len(service.list_documents()) == 1
 
 
+def test_fetch_reads_the_catalog_and_skips_a_saved_pdf(tmp_path: Path) -> None:
+    from docpilot.seed.download import fetch_set
+
+    sample = tmp_path / "irs"
+    sample.mkdir()
+    (sample / "SOURCES.md").write_text(
+        "- guide.pdf: https://example.gov/guide.pdf (10 KB)\n",
+        encoding="utf-8",
+    )
+    (sample / "guide.pdf").write_bytes(b"%PDF-already")
+    downloaded, skipped = fetch_set(tmp_path, "irs", opener=lambda url: b"%PDF-new")
+    assert downloaded == []
+    assert skipped == ["guide.pdf"]
+    (sample / "guide.pdf").unlink()
+    downloaded, skipped = fetch_set(tmp_path, "irs", opener=lambda url: b"%PDF-1.4")
+    assert downloaded == ["guide.pdf"]
+    assert skipped == []
+    assert (sample / "guide.pdf").read_bytes().startswith(b"%PDF-")
+
+
 def test_missing_set_is_an_error(tmp_path: Path) -> None:
     try:
         seed_set(tmp_path, "missing", _service(tmp_path))

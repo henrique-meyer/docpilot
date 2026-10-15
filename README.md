@@ -51,9 +51,10 @@ docker compose up --build
 
 The API listens on port 8000. `/` asks a question. `/admin` is the document catalog. The first visitor sets the admin password; later visits sign in with it. Jaeger is at <http://localhost:16686>.
 
-Sample catalogs live in `sample-docs/<set>/SOURCES.md`. The PDFs stay out of git. After they are on disk, this loads one set through the same path as an admin upload:
+Sample catalogs live in `sample-docs/<set>/SOURCES.md`. The PDFs stay out of git. This downloads one catalog, then loads it through the same path as an admin upload:
 
 ```bash
+make fetch SET=irs
 make seed SET=irs
 ```
 
