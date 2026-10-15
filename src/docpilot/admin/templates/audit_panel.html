@@ -6,7 +6,7 @@
   <tbody>
     {% for event in audit %}
     <tr>
-      <td>{{ event.at }}</td>
+      <td>{% if event.at %}<time class="local-time" datetime="{{ event.at }}">{{ event.at }}</time>{% else %}—{% endif %}</td>
       <td>{{ event.actor }}</td>
       <td>{{ event.action }}</td>
       <td>{{ event.detail or "—" }}</td>

@@ -26,7 +26,7 @@
       <td class="nowrap">{{ doc.pages }}</td>
       <td class="nowrap">{{ doc.chunk_count }}</td>
       <td class="nowrap">{{ doc.index_bytes | bytes }}</td>
-      <td class="nowrap">{{ doc.ingested_at or "—" }}</td>
+      <td class="nowrap">{% if doc.ingested_at %}<time class="local-time" datetime="{{ doc.ingested_at }}">{{ doc.ingested_at }}</time>{% else %}—{% endif %}</td>
       <td><span class="status status-{{ doc.status }}">{{ doc.status }}</span></td>
       <td class="actions">
         <form method="post" action="/admin/api/documents/{{ doc.id }}/delete">

@@ -834,6 +834,62 @@ def test_catalog_table_fills_its_panel(tmp_path: Path) -> None:
     assert "#catalog-panel table { width: 100%; }" in page.text
 
 
+def test_shown_timestamps_are_marked_for_the_browser_timezone(tmp_path: Path) -> None:
+    store = MemoryDocumentStore()
+    store.put_record(
+        DocumentRecord(
+            id="ready",
+            title="Ready guide",
+            source="ready.pdf",
+            year=None,
+            pages=1,
+            chunk_count=1,
+            index_bytes=10,
+            source_bytes=10,
+            ingested_at="2026-10-15T12:08:07+00:00",
+            status="ready",
+        )
+    )
+    store.put_record(
+        DocumentRecord(
+            id="working",
+            title="Working guide",
+            source="working.pdf",
+            year=None,
+            pages=0,
+            chunk_count=0,
+            index_bytes=10,
+            source_bytes=10,
+            ingested_at=None,
+            status="processing",
+        )
+    )
+    store.put_audit(
+        AuditEvent(
+            id="evt",
+            at="2026-10-15T12:08:07+00:00",
+            actor="admin",
+            action="processed",
+            document_id="ready",
+            detail="Ready guide",
+        )
+    )
+    client = _app(tmp_path, store)
+    _sign_in(client)
+    page = client.get("/admin")
+    catalog = client.get("/admin/api/catalog")
+    audit = client.get("/admin/api/audit")
+    stamp = "2026-10-15T12:08:07+00:00"
+    marked = f'<time class="local-time" datetime="{stamp}">{stamp}</time>'
+    assert marked in catalog.text
+    assert marked in audit.text
+    assert catalog.text.count("local-time") == 1
+    assert ">—<" in catalog.text
+    assert "function formatLocalTimes" in page.text
+    assert "toLocaleString(undefined" in page.text
+    assert "timeZoneName" in page.text
+
+
 def test_catalog_audit_and_usage_load_on_their_own(tmp_path: Path) -> None:
     store = MemoryDocumentStore()
     client = _app(tmp_path, store)

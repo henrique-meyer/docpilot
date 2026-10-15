@@ -356,6 +356,24 @@
         progress.setAttribute("aria-valuenow", String(percent));
       }
 
+      function formatLocalTimes(root) {
+        var nodes = root.querySelectorAll("time.local-time");
+        for (var i = 0; i < nodes.length; i++) {
+          var stamp = nodes[i].getAttribute("datetime");
+          var parsed = stamp ? new Date(stamp) : new Date(NaN);
+          if (isNaN(parsed.getTime())) continue;
+          nodes[i].textContent = parsed.toLocaleString(undefined, {
+            year: "numeric",
+            month: "short",
+            day: "numeric",
+            hour: "numeric",
+            minute: "2-digit",
+            second: "2-digit",
+            timeZoneName: "short"
+          });
+        }
+      }
+
       function loadPanel(id, url, generation) {
         var panel = document.getElementById(id);
         if (!panel) return Promise.resolve();
@@ -371,6 +389,7 @@
           if (!current) return;
           current.innerHTML = html;
           current.removeAttribute("aria-busy");
+          formatLocalTimes(current);
         }).catch(function () {
           if (generation !== loadGeneration) return;
           var current = document.getElementById(id);
@@ -626,6 +645,7 @@
       }
 
       restoreBanner();
+      formatLocalTimes(document);
       loadPanels();
     })();
   </script>
