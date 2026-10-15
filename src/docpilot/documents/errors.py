@@ -16,6 +16,7 @@ MESSAGES: dict[str, str] = {
     "bad_url": "That URL is not allowed.",
     "download_failed": "The URL could not be downloaded.",
     "not_found": "That document was not found.",
+    "not_failed": "Only a failed document can be retried.",
     "corrupt": "The stored document record could not be read.",
     "store_failed": "The file could not be stored.",
     "index_failed": "The file is stored, but it could not be indexed.",

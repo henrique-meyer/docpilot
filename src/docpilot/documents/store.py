@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """Source PDFs, catalog records, and audit events.
 
 Azure Blob is used when an account URL or connection string is set.
@@ -5,6 +7,8 @@ Otherwise files live under the local data directory.
 """
 
 import json
+import os
+import threading
 import time
 from pathlib import Path
 from typing import Protocol
@@ -19,6 +23,12 @@ from docpilot.documents.models import (
     record_from_json,
     summary_from_json,
 )
+
+
+class IndexClaim(Protocol):
+    def renew(self) -> None: ...
+
+    def release(self) -> None: ...
 
 
 class DocumentStore(Protocol):
@@ -46,7 +56,26 @@ class DocumentStore(Protocol):
 
     def get_pdf(self, document_id: str) -> bytes | None: ...
 
+    def claim_index(self, document_id: str) -> IndexClaim | None: ...
+
     def clear_corpus(self) -> None: ...
+
+
+class _MemoryClaim:
+    def __init__(self, store: MemoryDocumentStore, document_id: str) -> None:
+        self._store = store
+        self._document_id = document_id
+        self._released = False
+
+    def renew(self) -> None:
+        return
+
+    def release(self) -> None:
+        if self._released:
+            return
+        self._released = True
+        with self._store._claims_lock:
+            self._store._claims.discard(self._document_id)
 
 
 class MemoryDocumentStore:
@@ -55,6 +84,8 @@ class MemoryDocumentStore:
         self.records: dict[str, DocumentRecord] = {}
         self.audit: list[AuditEvent] = []
         self.summary: CatalogSummary | None = None
+        self._claims: set[str] = set()
+        self._claims_lock = threading.Lock()
 
     def put_pdf(self, document_id: str, data: bytes) -> None:
         self.pdfs[document_id] = data
@@ -93,11 +124,20 @@ class MemoryDocumentStore:
     def get_pdf(self, document_id: str) -> bytes | None:
         return self.pdfs.get(document_id)
 
+    def claim_index(self, document_id: str) -> IndexClaim | None:
+        with self._claims_lock:
+            if document_id in self._claims:
+                return None
+            self._claims.add(document_id)
+        return _MemoryClaim(self, document_id)
+
     def clear_corpus(self) -> None:
         self.pdfs.clear()
         self.records.clear()
         self.audit.clear()
         self.summary = None
+        with self._claims_lock:
+            self._claims.clear()
 
 
 class FileDocumentStore:
@@ -158,8 +198,20 @@ class FileDocumentStore:
             return None
         return path.read_bytes()
 
+    def claim_index(self, document_id: str) -> IndexClaim | None:
+        path = self._path("indexing", document_id)
+        if path.is_file() and time.time() - path.stat().st_mtime < 90:
+            return None
+        path.unlink(missing_ok=True)
+        try:
+            fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        except FileExistsError:
+            return None
+        os.close(fd)
+        return _FileClaim(path)
+
     def clear_corpus(self) -> None:
-        for folder in ("pdfs", "catalog", "audit"):
+        for folder in ("pdfs", "catalog", "audit", "indexing"):
             directory = self.root / folder
             if not directory.is_dir():
                 continue
@@ -264,8 +316,23 @@ class AzureBlobStore:
     def get_pdf(self, document_id: str) -> bytes | None:
         return self._download(f"documents/{document_id}.pdf")
 
+    def claim_index(self, document_id: str) -> IndexClaim | None:
+        from azure.core.exceptions import HttpResponseError, ResourceExistsError
+
+        client = self._client()
+        blob = client.get_blob_client(f"indexing/{document_id}")  # type: ignore[attr-defined]
+        try:
+            blob.upload_blob(b"", overwrite=False)
+        except ResourceExistsError:
+            pass
+        try:
+            lease = blob.acquire_lease(lease_duration=60)
+        except HttpResponseError:
+            return None
+        return _AzureClaim(lease)
+
     def clear_corpus(self) -> None:
-        for prefix in ("documents/", "catalog/", "audit/"):
+        for prefix in ("documents/", "catalog/", "audit/", "indexing/"):
             for name in self._names(prefix):
                 self._delete(name)
         self._delete("catalog-summary.json")
@@ -334,6 +401,43 @@ class AzureBlobStore:
             if isinstance(name, str):
                 names.append(name)
         return sorted(names)
+
+
+class _FileClaim:
+    def __init__(self, path: Path) -> None:
+        self._path = path
+        self._released = False
+
+    def renew(self) -> None:
+        if self._released or not self._path.is_file():
+            return
+        self._path.touch()
+
+    def release(self) -> None:
+        self._released = True
+        self._path.unlink(missing_ok=True)
+
+
+class _AzureClaim:
+    def __init__(self, lease: object) -> None:
+        self._lease = lease
+        self._released = False
+
+    def renew(self) -> None:
+        if self._released:
+            return
+        self._lease.renew()  # type: ignore[attr-defined]
+
+    def release(self) -> None:
+        if self._released:
+            return
+        self._released = True
+        from azure.core.exceptions import HttpResponseError
+
+        try:
+            self._lease.release()  # type: ignore[attr-defined]
+        except HttpResponseError:
+            return
 
 
 def build_store(settings: Settings) -> DocumentStore:

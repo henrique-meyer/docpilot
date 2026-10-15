@@ -1,5 +1,6 @@
 import os
 import re
+import time
 from io import BytesIO
 from pathlib import Path
 
@@ -1132,3 +1133,123 @@ def test_catalog_summary_is_stored_beside_the_catalog(tmp_path: Path) -> None:
     assert restored.list_audit()[0].detail == "Catalog summary saved"
     restored.clear_corpus()
     assert restored.get_summary() is None
+
+
+def _stored(
+    document_id: str,
+    status: str,
+    *,
+    title: str = "Guide",
+    source: str = "guide.pdf",
+) -> DocumentRecord:
+    return DocumentRecord(
+        id=document_id,
+        title=title,
+        source=source,
+        year=None,
+        pages=0,
+        chunk_count=0,
+        index_bytes=10,
+        source_bytes=20,
+        ingested_at=None,
+        status=status,
+    )
+
+
+def test_startup_resumes_documents_left_queued_or_processing(tmp_path: Path) -> None:
+    store = MemoryDocumentStore()
+    data = _pdf(title="2024 Stuck guide")
+    store.put_pdf("stuck", data)
+    store.put_record(_stored("stuck", "processing", title="2024 Stuck guide", source="stuck.pdf"))
+    store.put_record(_stored("missing", "queued", title="Missing guide", source="missing.pdf"))
+    store.put_record(
+        DocumentRecord(
+            id="ready",
+            title="Ready guide",
+            source="ready.pdf",
+            year=None,
+            pages=2,
+            chunk_count=3,
+            index_bytes=30,
+            source_bytes=40,
+            ingested_at="2026-10-15T12:00:00+00:00",
+            status="ready",
+        )
+    )
+    stuck = store.get_record("stuck")
+    missing = store.get_record("missing")
+    with TestClient(create_app(_settings(tmp_path), store)) as client:
+        assert client.get("/health").json() == {"status": "ok"}
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline:
+            stuck = store.get_record("stuck")
+            missing = store.get_record("missing")
+            if (
+                stuck is not None
+                and stuck.status == "ready"
+                and missing is not None
+                and missing.status == "failed"
+            ):
+                break
+            time.sleep(0.02)
+    assert stuck is not None
+    assert stuck.status == "ready"
+    assert stuck.pages == 1
+    assert stuck.title == "2024 Stuck guide"
+    assert missing is not None
+    assert missing.status == "failed"
+    assert missing.error == "The file could not be stored."
+    ready = store.get_record("ready")
+    assert ready is not None
+    assert ready.status == "ready"
+    assert ready.pages == 2
+    actions = [event.action for event in store.audit]
+    assert actions == ["processed", "failed"] or actions == ["failed", "processed"]
+    assert "upload" not in actions
+
+
+def test_failed_document_can_be_retried_from_the_catalog(tmp_path: Path) -> None:
+    store = MemoryDocumentStore()
+    service = DocumentService(store, _settings(tmp_path), ingestor=_BoomIngestor())  # type: ignore[arg-type]
+    data = _pdf(title="2024 Failed guide")
+    failed = service.begin_upload(data, source="failed.pdf")
+    service.finish_upload(failed.id, data)
+    saved = store.get_record(failed.id)
+    assert saved is not None
+    assert saved.status == "failed"
+    assert store.pdfs[failed.id] == data
+    store.put_record(_stored("ready-doc", "ready", title="Ready guide", source="ready.pdf"))
+    client = _app(tmp_path, store)
+    csrf = _sign_in(client)
+    catalog = client.get("/admin/api/catalog")
+    assert catalog.text.count(">Retry<") == 1
+    assert f'/admin/api/documents/{failed.id}/retry' in catalog.text
+    assert "/admin/api/documents/ready-doc/retry" not in catalog.text
+    outsider = TestClient(client.app)
+    assert outsider.post(
+        f"/admin/api/documents/{failed.id}/retry",
+        data={"csrf": csrf},
+        headers={"Accept": "application/json"},
+    ).status_code == 401
+    blocked = client.post(
+        "/admin/api/documents/ready-doc/retry",
+        data={"csrf": csrf},
+        headers={"Accept": "application/json"},
+    )
+    assert blocked.status_code == 409
+    assert blocked.json()["message"] == "Only a failed document can be retried."
+    retried = client.post(
+        f"/admin/api/documents/{failed.id}/retry",
+        data={"csrf": csrf},
+        headers={"Accept": "application/json"},
+    )
+    assert retried.status_code == 202
+    assert retried.json()["message"] == "Indexing started again."
+    done = store.get_record(failed.id)
+    assert done is not None
+    assert done.status == "ready"
+    assert store.pdfs[failed.id] == data
+    actions = [event.action for event in store.audit]
+    assert "retry" in actions
+    assert "processed" in actions
+    assert ">Retry<" not in client.get("/admin/api/catalog").text

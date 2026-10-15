@@ -405,6 +405,16 @@ Setup instructions a reader can follow to reproduce the resources DocPilot needs
 
 Sample PDFs are not part of the running application. An admin uploads them by hand. The guide does not treat seeding as environment setup, and it does not include a deploy command. The README points at the guide and does not list this environment's resource names.
 
+### DOCPILOT-46 — Resume indexing after a restart, and retry a failed document
+
+Found Thursday 15 October 2026.
+
+Indexing runs inside the API process. A container restart abandons any document left queued or processing. The catalog row stays on that status with no error, and nothing reads the stored PDF again.
+
+On startup, resume every document that is queued or processing. Read the stored PDF and run the same ingest path as an upload. If the PDF is missing, mark the row failed.
+
+A failed row can be retried. The catalog shows a Retry control on a failed document. Retry reads the stored PDF, sets the status back to processing, and runs ingest again. The stored file stays. A retry that fails stays failed and can be retried again. Ready and processing rows do not show Retry.
+
 ## Issue index
 
 | Key | Summary | Due | URL |
@@ -454,3 +464,4 @@ Sample PDFs are not part of the running application. An admin uploads them by ha
 | DOCPILOT-43 | Show timestamps in the user's timezone | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-43 |
 | DOCPILOT-44 | Submit the ask box with Enter | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-44 |
 | DOCPILOT-45 | Environment setup guide with placeholder resource names | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-45 |
+| DOCPILOT-46 | Resume indexing after a restart, and retry a failed document | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-46 |

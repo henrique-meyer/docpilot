@@ -29,6 +29,12 @@
       <td class="nowrap">{% if doc.ingested_at %}<time class="local-time" datetime="{{ doc.ingested_at }}">{{ doc.ingested_at }}</time>{% else %}—{% endif %}</td>
       <td><span class="status status-{{ doc.status }}">{{ doc.status }}</span></td>
       <td class="actions">
+        {% if doc.status == "failed" %}
+        <form method="post" action="/admin/api/documents/{{ doc.id }}/retry">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <button type="submit" class="quiet">Retry</button>
+        </form>
+        {% endif %}
         <form method="post" action="/admin/api/documents/{{ doc.id }}/delete">
           <input type="hidden" name="csrf" value="{{ csrf }}">
           <button type="submit" class="icon" aria-label="Delete">

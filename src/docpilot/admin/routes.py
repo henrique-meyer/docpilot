@@ -35,6 +35,7 @@ _TEMPLATES = Environment(
 
 NOTICES = {
     "upload_queued": "The file is stored. Indexing continues until the status is ready.",
+    "retry_queued": "Indexing started again.",
     "replace_queued": "Replacement started. The previous file stays until the new one is stored.",
     "deleted": "Document deleted.",
     "reset": "Catalog, documents, and the audit log were deleted.",
@@ -570,6 +571,33 @@ async def replace_document(
         return _error_response(request, exc.code, status)
     background.add_task(service.finish_replace, document_id, data)
     return _accepted(request, "replace_queued")
+
+
+@router.post("/admin/api/documents/{document_id}/retry")
+def retry_document(
+    document_id: str,
+    request: Request,
+    background: BackgroundTasks,
+    csrf: str = Form(""),
+) -> Response:
+    denied = _require_admin(request)
+    if denied is not None:
+        return denied
+    denied = _require_csrf(request, csrf)
+    if denied is not None:
+        return denied
+    try:
+        _service(request).begin_retry(document_id)
+    except DocumentError as exc:
+        if exc.code == "not_found":
+            status = 404
+        elif exc.code == "not_failed":
+            status = 409
+        else:
+            status = 400
+        return _error_response(request, exc.code, status)
+    background.add_task(_service(request).index_stored, document_id)
+    return _accepted(request, "retry_queued")
 
 
 @router.post("/admin/api/documents/{document_id}/delete")
