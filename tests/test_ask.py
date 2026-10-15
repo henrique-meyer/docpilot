@@ -143,6 +143,23 @@ def test_enter_submits_the_ask_box(tmp_path: Path) -> None:
     assert "form.requestSubmit()" in page.text
 
 
+def test_home_page_credits_the_designer(tmp_path: Path) -> None:
+    page = _client(tmp_path, Asker(None, None)).get("/")
+    assert page.status_code == 200
+    text = page.text
+    credit = text.index('class="site-credit"')
+    assert credit > text.index('id="result"')
+    assert "Designed &amp; built by" in text
+    assert 'href="https://www.hmeyer.dev" target="_blank" rel="noopener">Henrique Meyer</a>' in text
+    assert (
+        'href="https://github.com/henrique-meyer/docpilot" target="_blank" rel="noopener"'
+        in text
+    )
+    assert "Source on GitHub" in text
+    assert "©" not in text
+    assert "Cursor" not in text
+
+
 def test_home_page_states_the_disclaimer(tmp_path: Path) -> None:
     client = _client(tmp_path, Asker(None, None))
     page = client.get("/")

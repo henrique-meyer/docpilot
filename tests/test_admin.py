@@ -108,6 +108,32 @@ def test_health_stays_public(tmp_path: Path) -> None:
     assert response.json() == {"status": "ok"}
 
 
+def test_admin_pages_credit_the_designer(tmp_path: Path) -> None:
+    client = _app(tmp_path)
+    login = client.get("/admin/login")
+    assert login.status_code == 200
+    _sign_in(client)
+    pages = (
+        login,
+        client.get("/admin"),
+        client.get("/admin/reset"),
+        client.get("/admin/password"),
+    )
+    for page in pages:
+        assert page.status_code == 200
+        text = page.text
+        assert text.index('class="site-credit"') > text.index("<main>")
+        assert "Designed &amp; built by" in text
+        assert 'href="https://www.hmeyer.dev" target="_blank" rel="noopener">Henrique Meyer</a>' in text
+        assert (
+            'href="https://github.com/henrique-meyer/docpilot" target="_blank" rel="noopener"'
+            in text
+        )
+        assert "Source on GitHub" in text
+        assert "©" not in text
+        assert "Cursor" not in text
+
+
 def test_admin_pages_use_the_public_header(tmp_path: Path) -> None:
     client = _app(tmp_path)
     login = client.get("/admin/login")
