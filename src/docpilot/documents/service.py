@@ -78,6 +78,33 @@ class DocumentService:
                 raise
         return record
 
+    def accept_upload(self, data: bytes, *, source: str) -> DocumentRecord:
+        """Store the PDF, then refuse it when the extracted text would pass the limit.
+
+        File upload and add-by-URL both use this. A refusal deletes the stored
+        PDF and the catalog row before the caller returns an error.
+        """
+        record = self.begin_upload(data, source=source)
+        try:
+            info = extract_pdf(data)
+        except DocumentError:
+            self._discard_upload(record.id)
+            raise
+        with self._lock:
+            current = self.store.get_record(record.id)
+            if current is None:
+                self.store.delete_pdf(record.id)
+                raise DocumentError("not_found")
+            try:
+                self._ensure_capacity(info.index_bytes, excluding=record.id)
+            except DocumentError:
+                self.store.delete_pdf(record.id)
+                self.store.delete_record(record.id)
+                raise
+            current.index_bytes = info.index_bytes
+            self.store.put_record(current)
+            return current
+
     def finish_upload(self, document_id: str, data: bytes) -> None:
         with self._lock:
             record = self.store.get_record(document_id)
@@ -94,7 +121,7 @@ class DocumentService:
             self.store.put_record(record)
             try:
                 info = extract_pdf(data)
-                self._ensure_capacity(info.index_bytes, excluding=None)
+                self._ensure_capacity(info.index_bytes, excluding=document_id)
                 result = self.ingestor.ingest(
                     data,
                     document_id=document_id,
@@ -112,6 +139,7 @@ class DocumentService:
                 self.store.put_record(record)
                 self._audit("upload", record.id, record.title)
             except DocumentError as exc:
+                record.index_bytes = 0
                 record.status = "failed"
                 record.error = MESSAGES.get(exc.code, MESSAGES["not_pdf"])
                 self.store.put_record(record)
@@ -199,6 +227,12 @@ class DocumentService:
                 current.error = MESSAGES["index_failed"]
                 self.store.put_record(current)
                 self._audit("replace_failed", document_id, current.error)
+
+    def _discard_upload(self, document_id: str) -> None:
+        with self._lock:
+            self.store.delete_pdf(document_id)
+            if self.store.get_record(document_id) is not None:
+                self.store.delete_record(document_id)
 
     def _store_new_pdf(self, document_id: str, data: bytes) -> None:
         self.store.put_pdf(document_id, data)

@@ -535,7 +535,7 @@ def _queue_upload(
 ) -> Response:
     service = _service(request)
     try:
-        record = service.begin_upload(data, source=source)
+        record = service.accept_upload(data, source=source)
     except DocumentError as exc:
         return _error_response(request, exc.code, 400)
     background.add_task(service.finish_upload, record.id, data)
