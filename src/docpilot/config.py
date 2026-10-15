@@ -84,6 +84,8 @@ class Settings:
     eval_citation_accuracy: float = 0.9
     eval_groundedness: float = 0.8
     eval_red_team_pass_rate: float = 1.0
+    agent_max_tool_calls: int = 6
+    agent_timeout_seconds: int = 30
 
     @property
     def admin_configured(self) -> bool:
@@ -124,4 +126,6 @@ class Settings:
             eval_citation_accuracy=_float("DOCPILOT_EVAL_CITATION_ACCURACY", 0.9),
             eval_groundedness=_float("DOCPILOT_EVAL_GROUNDEDNESS", 0.8),
             eval_red_team_pass_rate=_float("DOCPILOT_EVAL_RED_TEAM_PASS_RATE", 1.0),
+            agent_max_tool_calls=_int("DOCPILOT_AGENT_MAX_TOOL_CALLS", 6),
+            agent_timeout_seconds=_int("DOCPILOT_AGENT_TIMEOUT_SECONDS", 30),
         )
