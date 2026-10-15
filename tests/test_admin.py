@@ -827,6 +827,13 @@ def test_failed_ingest_keeps_the_stored_pdf(tmp_path: Path) -> None:
     assert [event.action for event in store.audit] == ["upload", "failed"]
 
 
+def test_catalog_table_fills_its_panel(tmp_path: Path) -> None:
+    client = _app(tmp_path, MemoryDocumentStore())
+    _sign_in(client)
+    page = client.get("/admin")
+    assert "#catalog-panel table { width: 100%; }" in page.text
+
+
 def test_catalog_audit_and_usage_load_on_their_own(tmp_path: Path) -> None:
     store = MemoryDocumentStore()
     client = _app(tmp_path, store)
