@@ -38,6 +38,7 @@ NOTICES = {
     "deleted": "Document deleted.",
     "reset": "Catalog, documents, and the audit log were deleted.",
     "logged_out": "Signed out.",
+    "password_changed": "Password updated.",
 }
 
 
@@ -440,6 +441,51 @@ def delete_document(document_id: str, request: Request, csrf: str = Form("")) ->
 @router.delete("/admin/api/documents/{document_id}")
 def delete_document_method(document_id: str, request: Request, csrf: str = Form("")) -> Response:
     return _delete(document_id, request, csrf)
+
+
+@router.get("/admin/password")
+def password_page(request: Request) -> Response:
+    denied = _require_admin(request)
+    if denied is not None:
+        return denied
+    session = read_session(request, _settings(request))
+    return _render(
+        "password.html",
+        csrf=session.csrf if session else "",
+    )
+
+
+@router.post("/admin/password")
+def change_password(
+    request: Request,
+    password: str = Form(""),
+    confirm: str = Form(""),
+    csrf: str = Form(""),
+) -> Response:
+    denied = _require_admin(request)
+    if denied is not None:
+        return denied
+    denied = _require_csrf(request, csrf)
+    if denied is not None:
+        return denied
+    session = read_session(request, _settings(request))
+    token = session.csrf if session else ""
+    if len(password) < MIN_PASSWORD_CHARS:
+        return _render(
+            "password.html",
+            status_code=400,
+            csrf=token,
+            error=MESSAGES["password_short"],
+        )
+    if password != confirm:
+        return _render(
+            "password.html",
+            status_code=400,
+            csrf=token,
+            error=MESSAGES["password_mismatch"],
+        )
+    _login_state(request).change(password)
+    return _redirect(request, "/admin", notice="password_changed")
 
 
 @router.get("/admin/reset")
