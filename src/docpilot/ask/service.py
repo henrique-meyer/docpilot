@@ -2,17 +2,20 @@
 
 from __future__ import annotations
 
+import logging
 import uuid
 from dataclasses import dataclass
 from typing import Protocol
 
 from docpilot.config import Settings
+from docpilot.observe import bind_trace, span
 from docpilot.retrieve.context import Hit
 from docpilot.retrieve.prompt import build_prompt
 
 NOT_FOUND = "not found in the documents"
 DEMO_LIMIT = "demo limit reached"
 SNIPPET_CHARS = 240
+logger = logging.getLogger(__name__)
 
 
 class PassageSource(Protocol):
@@ -38,13 +41,22 @@ class Asker:
 
     def ask(self, question: str) -> AskResult:
         trace_id = uuid.uuid4().hex
-        hits = self.retriever.retrieve(question) if self.retriever is not None else []
-        if not hits or self.chat is None:
-            return AskResult(NOT_FOUND, [], trace_id)
-        text, tokens = self.chat.complete(build_prompt(question, hits))
-        if _is_not_found(text):
-            return AskResult(NOT_FOUND, [], trace_id, tokens)
-        return AskResult(text.strip(), [_citation(hit) for hit in hits], trace_id, tokens)
+        bind_trace(trace_id)
+        with span("api.ask") as current:
+            hits = self.retriever.retrieve(question) if self.retriever is not None else []
+            current.set_attribute("hits", len(hits))
+            if not hits or self.chat is None:
+                current.set_attribute("tokens", 0)
+                logger.info("ask completed")
+                return AskResult(NOT_FOUND, [], trace_id)
+            with span("llm") as model:
+                text, tokens = self.chat.complete(build_prompt(question, hits))
+                model.set_attribute("tokens", tokens)
+            current.set_attribute("tokens", tokens)
+            logger.info("ask completed")
+            if _is_not_found(text):
+                return AskResult(NOT_FOUND, [], trace_id, tokens)
+            return AskResult(text.strip(), [_citation(hit) for hit in hits], trace_id, tokens)
 
 
 def _is_not_found(text: str) -> bool:

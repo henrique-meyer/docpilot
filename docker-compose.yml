@@ -1,0 +1,20 @@
+# Compose runs the API and Jaeger together.
+# An image is the built filesystem. A container is a running process from that image.
+
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      # Jaeger accepts OTLP on this port. The UI is http://localhost:16686.
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
+      DOCPILOT_COOKIE_SECURE: "false"
+    depends_on:
+      - jaeger
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.62.0
+    ports:
+      - "16686:16686"
+      - "4318:4318"
