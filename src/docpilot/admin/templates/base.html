@@ -106,7 +106,16 @@
       color: white;
       cursor: pointer;
     }
-    button.quiet { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+    button.quiet, a.quiet {
+      display: inline-block;
+      background: transparent;
+      color: var(--ink);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 8px 12px;
+      text-decoration: none;
+    }
+    .form-actions { display: flex; gap: 8px; align-items: center; }
     button.danger, a.danger {
       display: inline-block;
       background: var(--danger);

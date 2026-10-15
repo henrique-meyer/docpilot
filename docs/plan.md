@@ -265,6 +265,12 @@ Found Thursday 15 October 2026.
 
 A signed-in admin header has an Admin menu on the right: Documents, Reset Catalog, Change Password, and Sign Out. Documents opens `/admin`. Sign Out posts the existing logout. The sign-in page has no menu. The documents page no longer has its own Password, Sign out, or Reset catalog controls.
 
+### DOCPILOT-30 — Add Cancel to the change-password page
+
+Found Thursday 15 October 2026.
+
+The change-password page has a Cancel control next to Update password. Cancel returns to `/admin` and does not change the password.
+
 ## Issue index
 
 | Key | Summary | Due | URL |
@@ -296,3 +302,4 @@ A signed-in admin header has an Admin menu on the right: Documents, Reset Catalo
 | DOCPILOT-25 | Keep admin messages out of the address bar | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-25 |
 | DOCPILOT-26 | Export PNG copies of the logo | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-26 |
 | DOCPILOT-29 | Add an Admin menu to the header | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-29 |
+| DOCPILOT-30 | Add Cancel to the change-password page | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-30 |
