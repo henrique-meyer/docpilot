@@ -64,7 +64,9 @@
     .catalog-summary p { margin: 0 0 8px; }
     .catalog-summary ul { margin: 0; padding-left: 1.2rem; }
     .catalog-summary li { margin: 4px 0; }
-    .disclaimer { color: var(--muted); font-size: 0.92rem; }
+    .disclaimer, .site-credit { color: var(--muted); font-size: 0.92rem; }
+    .site-credit { margin: 16px 0 0; }
+    .site-credit a { color: inherit; white-space: nowrap; }
     .answer { margin-top: 16px; white-space: pre-wrap; }
     .citation { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
     .citation strong { display: block; }
@@ -98,6 +100,7 @@
     </form>
     <p id="status" class="status hidden"></p>
     <section id="result" class="answer hidden"></section>
+    <p class="site-credit">Designed &amp; built by <a href="https://www.hmeyer.dev" target="_blank" rel="noopener">Henrique Meyer</a> · <a href="https://github.com/henrique-meyer/docpilot" target="_blank" rel="noopener">Source on GitHub</a></p>
   </main>
   <script>
     const form = document.getElementById("ask");

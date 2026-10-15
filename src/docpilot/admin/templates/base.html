@@ -30,6 +30,8 @@
     h2 { font-size: 1.1rem; margin: 28px 0 12px; }
     p { color: var(--muted); }
     a { color: var(--accent); }
+    .site-credit { margin: 16px 0 0; font-size: 0.92rem; }
+    .site-credit a { color: inherit; white-space: nowrap; }
     header {
       display: flex;
       align-items: center;
@@ -202,6 +204,7 @@
   </header>
   <main>
     {% block body %}{% endblock %}
+    <p class="site-credit">Designed &amp; built by <a href="https://www.hmeyer.dev" target="_blank" rel="noopener">Henrique Meyer</a> · <a href="https://github.com/henrique-meyer/docpilot" target="_blank" rel="noopener">Source on GitHub</a></p>
   </main>
   <script>
     (function () {
