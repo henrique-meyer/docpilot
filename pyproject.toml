@@ -26,6 +26,8 @@ dev = [
   "mypy>=1.13",
   "pytest>=8",
   "ruff>=0.7",
+  "langchain-core>=1.0,<2",
+  "langchain-openai>=1.7,<2",
 ]
 
 [build-system]
@@ -53,5 +55,5 @@ mypy_path = "src"
 packages = ["docpilot"]
 
 [[tool.mypy.overrides]]
-module = ["azure.*", "openai"]
+module = ["azure.*", "openai", "langchain.*", "langchain_core.*", "langchain_openai", "langchain_openai.*"]
 ignore_missing_imports = true
