@@ -1,4 +1,5 @@
 {% if audit %}
+<div class="audit-scroll" data-shown="{{ audit_shown }}" data-total="{{ audit_total }}">
 <table>
   <thead>
     <tr><th>When</th><th>Who</th><th>Action</th><th>Detail</th></tr>
@@ -14,6 +15,10 @@
     {% endfor %}
   </tbody>
 </table>
+{% if audit_shown < audit_total %}
+<p class="audit-more">Scroll to load more.</p>
+{% endif %}
+</div>
 {% else %}
 <p>No admin actions yet.</p>
 {% endif %}
