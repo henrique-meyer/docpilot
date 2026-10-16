@@ -128,7 +128,7 @@ resource embeddingDeployment 'Microsoft.CognitiveServices/accounts/deployments@2
   name: 'text-embedding-3-small'
   sku: {
     name: 'DataZoneStandard'
-    capacity: 10
+    capacity: 500
   }
   properties: {
     model: {
