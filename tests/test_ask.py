@@ -150,7 +150,7 @@ def test_home_page_credits_the_designer(tmp_path: Path) -> None:
     credit = text.index('class="site-credit"')
     assert credit > text.index('id="result"')
     assert "Designed &amp; built by" in text
-    assert 'href="https://www.hmeyer.dev" target="_blank" rel="noopener">Henrique Meyer</a>' in text
+    assert 'href="https://www.hmeyer.com" target="_blank" rel="noopener">Henrique Meyer</a>' in text
     assert (
         'href="https://github.com/henrique-meyer/docpilot" target="_blank" rel="noopener"'
         in text
