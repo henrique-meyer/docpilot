@@ -3,10 +3,14 @@
 The container app uses its managed identity. Tests never construct this module's clients.
 """
 
+import logging
+
 from docpilot.ingest.chunk import Chunk
 from docpilot.ingest.pipeline import VECTOR_DIMENSIONS
 
 SEMANTIC_CONFIG = "docpilot-semantic"
+
+logger = logging.getLogger(__name__)
 
 
 class AzureEmbedder:
@@ -175,6 +179,20 @@ class AzureChunkIndex:
         except ResourceNotFoundError:
             client.create_index(index)  # type: ignore[attr-defined]
         self._ready = True
+
+    def storage_usage(self) -> tuple[int, int] | None:
+        """Search index storage used and the service quota, in bytes."""
+        try:
+            stats = self._indexes().get_service_statistics()  # type: ignore[attr-defined]
+            counter = stats.counters.storage_size_counter
+            usage = int(counter.usage)
+            quota = int(counter.quota or 0)
+        except Exception:
+            logger.warning("could not read search storage", exc_info=True)
+            return None
+        if quota <= 0:
+            return None
+        return usage, quota
 
     def _indexes(self) -> object:
         from azure.identity import DefaultAzureCredential

@@ -1,3 +1,4 @@
+from docpilot.ingest.azure import AzureChunkIndex
 from docpilot.retrieve.azure import AzureHybridSearch
 
 
@@ -14,6 +15,37 @@ class _Client:
     def search(self, **kwargs: object) -> list[object]:
         del kwargs
         raise _StatusError(self.status_code)
+
+
+class _Counter:
+    def __init__(self, usage: int, quota: int | None) -> None:
+        self.usage = usage
+        self.quota = quota
+
+
+class _Stats:
+    def __init__(self, usage: int, quota: int | None) -> None:
+        self.counters = type("Counters", (), {"storage_size_counter": _Counter(usage, quota)})()
+
+
+class _StatsClient:
+    def __init__(self, usage: int, quota: int | None) -> None:
+        self._stats = _Stats(usage, quota)
+
+    def get_service_statistics(self) -> _Stats:
+        return self._stats
+
+
+def test_storage_usage_reads_the_service_counter() -> None:
+    index = AzureChunkIndex("https://example.search.windows.net", "docpilot")
+    index._indexes = lambda: _StatsClient(56_079_230, 52_428_800)  # type: ignore[method-assign]
+    assert index.storage_usage() == (56_079_230, 52_428_800)
+
+
+def test_storage_usage_without_a_quota_is_unavailable() -> None:
+    index = AzureChunkIndex("https://example.search.windows.net", "docpilot")
+    index._indexes = lambda: _StatsClient(10, None)  # type: ignore[method-assign]
+    assert index.storage_usage() is None
 
 
 def test_missing_index_returns_no_hits() -> None:

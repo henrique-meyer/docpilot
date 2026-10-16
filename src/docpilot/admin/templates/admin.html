@@ -9,7 +9,7 @@
 {% endblock %}
 {% block body %}
   <h1>Documents</h1>
-  <p>A PDF is saved to storage and added to the catalog only after that upload is confirmed. Chunking and indexing run after that. The bar uses extracted text size against the 50 MB Free-tier limit.</p>
+  <p>A PDF is saved to storage and added to the catalog only after that upload is confirmed. Chunking and indexing run after that. The bar shows the search index size against the service storage quota.</p>
   <div id="page-banner" class="banner {% if error %}error{% else %}notice{% endif %}" {% if not error and not notice %}hidden{% endif %} data-autodismiss>{{ error or notice }}</div>
 
   <div id="usage-panel" class="card" aria-busy="true"><p>Loading…</p></div>

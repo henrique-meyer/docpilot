@@ -477,6 +477,20 @@ Raise `text-embedding-3-small` to capacity 500: 500,000 tokens per minute and 50
 
 Update `infra/main.bicep` and the setup guide so the next deploy keeps 500. Apply only this deployment in Azure. Do not change the Azure AI Search SKU. Do not change the container replica size or CPU.
 
+### DOCPILOT-53 — Show the search index size on the usage meter
+
+Found Friday 16 October 2026.
+
+The admin meter shows extracted text from ready documents against a 50 MB application limit, and the page calls that bar the free-tier limit. The free tier's 50 MB is Azure AI Search index storage: stored text, vectors, and index overhead. The service reports about 53.5 MB used of a 50.0 MB quota, which is why indexing is refused while the meter shows about 8.8 MB.
+
+The meter shows the search service storage usage against the search service storage quota. Both numbers come from the service statistics, so a different tier would show that tier's quota. The bar fills from that pair. When usage is over the quota, the numbers still show the real usage and the bar is full.
+
+The source-files line stays the total size of the stored PDFs.
+
+Where there is no search service, the meter keeps the extracted-text total against the configured limit.
+
+The upload check that compares extracted text with the configured limit stays as it is.
+
 ## Issue index
 
 | Key | Summary | Due | URL |
@@ -533,3 +547,4 @@ Update `infra/main.bicep` and the setup guide so the next deploy keeps 500. Appl
 | DOCPILOT-50 | Keep indexing until a document is ready or failed | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-50 |
 | DOCPILOT-51 | Index documents off the request path so uploads cannot stall the site | 2026-10-16 | https://nitro.atlassian.net/browse/DOCPILOT-51 |
 | DOCPILOT-52 | Raise embedding capacity so a handful of documents index in minutes | 2026-10-16 | https://nitro.atlassian.net/browse/DOCPILOT-52 |
+| DOCPILOT-53 | Show the search index size on the usage meter | 2026-10-16 | https://nitro.atlassian.net/browse/DOCPILOT-53 |
