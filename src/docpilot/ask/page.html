@@ -67,8 +67,16 @@
     .disclaimer, .site-credit { color: var(--muted); font-size: 0.92rem; }
     .site-credit { margin: 16px 0 0; }
     .site-credit a { color: inherit; white-space: nowrap; }
-    .answer { margin-top: 16px; white-space: pre-wrap; }
-    .citation { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+    .answer { margin-top: 16px; }
+    .answer > p { margin: 0 0 0.8em; }
+    .citation {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid var(--line);
+      font-size: 0.88em;
+      line-height: 1.45;
+    }
+    .citation p { margin: 0.35em 0 0; }
     .citation strong { display: block; }
     .hidden { display: none; }
     .status { margin-top: 12px; color: var(--muted); }
@@ -103,6 +111,60 @@
     <p class="site-credit">Designed &amp; built by <a href="https://www.hmeyer.com" target="_blank" rel="noopener">Henrique Meyer</a> · <a href="https://github.com/henrique-meyer/docpilot" target="_blank" rel="noopener">Source on GitHub</a></p>
   </main>
   <script>
+    function renderAnswer(container, text) {
+      for (const paragraph of text.split(/\n{2,}/)) {
+        const trimmed = paragraph.trim();
+        if (!trimmed) continue;
+        const block = document.createElement("p");
+        appendFormatted(block, trimmed);
+        container.appendChild(block);
+      }
+    }
+
+    function appendFormatted(parent, text) {
+      let index = 0;
+      while (index < text.length) {
+        if (text.startsWith("**", index) || text.startsWith("__", index)) {
+          const marker = text.slice(index, index + 2);
+          const end = text.indexOf(marker, index + 2);
+          if (end !== -1) {
+            const strong = document.createElement("strong");
+            strong.textContent = text.slice(index + 2, end);
+            parent.appendChild(strong);
+            index = end + 2;
+            continue;
+          }
+        }
+        if (text[index] === "*" && text[index + 1] !== "*") {
+          const end = text.indexOf("*", index + 1);
+          if (end !== -1 && !text.slice(index + 1, end).includes("\n")) {
+            const em = document.createElement("em");
+            em.textContent = text.slice(index + 1, end);
+            parent.appendChild(em);
+            index = end + 1;
+            continue;
+          }
+        }
+        if (text[index] === "\n") {
+          parent.appendChild(document.createElement("br"));
+          index += 1;
+          continue;
+        }
+        let next = text.length;
+        for (const token of ["\n", "**", "__", "*"]) {
+          const at = text.indexOf(token, index);
+          if (at !== -1 && at < next) next = at;
+        }
+        if (next === index) {
+          parent.appendChild(document.createTextNode(text[index]));
+          index += 1;
+          continue;
+        }
+        parent.appendChild(document.createTextNode(text.slice(index, next)));
+        index = next;
+      }
+    }
+
     const form = document.getElementById("ask");
     const question = document.getElementById("question");
     const status = document.getElementById("status");
@@ -144,9 +206,7 @@
       };
       status.classList.add("hidden");
       result.classList.remove("hidden");
-      const answer = document.createElement("p");
-      answer.textContent = body.answer || messages[body.error] || "No answer.";
-      result.appendChild(answer);
+      renderAnswer(result, body.answer || messages[body.error] || "No answer.");
       for (const citation of body.citations || []) {
         const block = document.createElement("div");
         block.className = "citation";

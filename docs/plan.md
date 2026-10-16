@@ -497,6 +497,14 @@ Found Friday 16 October 2026.
 
 The footer credit on every page links Henrique Meyer to https://www.hmeyer.dev. Change that link to https://www.hmeyer.com. The rest of the line stays: Designed & built by Henrique Meyer · Source on GitHub. The GitHub link stays. The link still opens in a new tab.
 
+### DOCPILOT-55 — Render answer markdown and shrink the citations
+
+Found Friday 16 October 2026.
+
+Answers show the model markdown as typed. Bold markers such as **stay visible** instead of becoming bold text. Render the answer markdown.
+
+The citations under the answer are the same size as the answer. Make those citations a little smaller than the answer.
+
 ## Issue index
 
 | Key | Summary | Due | URL |
@@ -555,3 +563,4 @@ The footer credit on every page links Henrique Meyer to https://www.hmeyer.dev. 
 | DOCPILOT-52 | Raise embedding capacity so a handful of documents index in minutes | 2026-10-16 | https://nitro.atlassian.net/browse/DOCPILOT-52 |
 | DOCPILOT-53 | Show the search index size on the usage meter | 2026-10-16 | https://nitro.atlassian.net/browse/DOCPILOT-53 |
 | DOCPILOT-54 | Point the footer credit at hmeyer.com | 2026-10-16 | https://nitro.atlassian.net/browse/DOCPILOT-54 |
+| DOCPILOT-55 | Render answer markdown and shrink the citations | 2026-10-16 | https://nitro.atlassian.net/browse/DOCPILOT-55 |
