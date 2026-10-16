@@ -67,13 +67,23 @@ class DocumentService:
         self.settings = settings
         self.ingestor = ingestor or Ingestor(None, MemoryIndex())
         self._lock = threading.Lock()
+        self._wake = threading.Event()
 
     def list_documents(self) -> list[DocumentRecord]:
         return sorted(self.store.list_records(), key=lambda record: record.title.lower())
 
     def list_audit(self, limit: int = 30) -> list[AuditEvent]:
+        events, _total = self.audit_page(limit=limit)
+        return events
+
+    def audit_page(self, *, limit: int, offset: int = 0) -> tuple[list[AuditEvent], int]:
         events = sorted(self.store.list_audit(), key=lambda event: event.id, reverse=True)
-        return events[:limit]
+        start = max(0, offset)
+        size = 10 if limit < 1 else min(limit, 1000)
+        return events[start : start + size], len(events)
+
+    def wake(self) -> None:
+        self._wake.set()
 
     def get_summary(self) -> CatalogSummary:
         found = self.store.get_summary()
@@ -130,37 +140,17 @@ class DocumentService:
             self._store_new_pdf(record.id, data)
             try:
                 self.store.put_record(record)
+                self._audit("upload", record.id, _label(record))
             except Exception:
-                self.store.delete_pdf(record.id)
-                raise
-        return record
-
-    def accept_upload(self, data: bytes, *, source: str) -> DocumentRecord:
-        """Store the PDF, then refuse it when the extracted text would pass the limit.
-
-        File upload and add-by-URL both use this. A refusal deletes the stored
-        PDF and the catalog row before the caller returns an error.
-        """
-        record = self.begin_upload(data, source=source)
-        try:
-            info = extract_pdf(data)
-        except DocumentError:
-            self._discard_upload(record.id)
-            raise
-        with self._lock:
-            current = self.store.get_record(record.id)
-            if current is None:
-                self.store.delete_pdf(record.id)
-                raise DocumentError("not_found")
-            try:
-                self._ensure_capacity(info.index_bytes, excluding=record.id)
-            except DocumentError:
                 self.store.delete_pdf(record.id)
                 self.store.delete_record(record.id)
                 raise
-            current.index_bytes = info.index_bytes
-            self.store.put_record(current)
-            return current
+        self.wake()
+        return record
+
+    def accept_upload(self, data: bytes, *, source: str) -> DocumentRecord:
+        """Store the PDF and catalog row, then return. Indexing runs on the watcher."""
+        return self.begin_upload(data, source=source)
 
     def finish_upload(self, document_id: str, data: bytes) -> None:
         with self._lock:
@@ -173,18 +163,11 @@ class DocumentService:
                 self.store.put_record(record)
                 self._audit("upload_failed", record.id, record.error)
                 return
-            record.status = "processing"
-            record.error = None
-            self.store.put_record(record)
-            self._audit("upload", record.id, _label(record))
-            self._index_held(
-                record,
-                data,
-                success_action="processed",
-                failure_action="failed",
-                failure_fallback=MESSAGES["not_pdf"],
-                zero_index=True,
-            )
+            if record.status == "queued":
+                record.status = "processing"
+                record.error = None
+                self.store.put_record(record)
+        self.index_stored(document_id)
 
     def reset(self) -> None:
         with self._lock:
@@ -201,16 +184,12 @@ class DocumentService:
             self.store.delete_record(document_id)
             self._audit("delete", document_id, record.title)
 
-    def finish_replace(self, document_id: str, data: bytes) -> None:
-        try:
-            self.validate_upload(data)
-        except DocumentError as exc:
-            self._audit("replace_failed", document_id, MESSAGES.get(exc.code, "Replace failed."))
-            return
+    def begin_replace(self, document_id: str, data: bytes) -> None:
+        self.validate_upload(data)
         with self._lock:
             current = self.store.get_record(document_id)
             if current is None:
-                return
+                raise DocumentError("not_found")
             try:
                 self.store.put_pdf(document_id, data)
                 if not self.store.confirm_pdf(document_id, len(data)):
@@ -221,25 +200,18 @@ class DocumentService:
                     document_id,
                     MESSAGES.get(exc.code, MESSAGES["store_failed"]),
                 )
-                return
+                raise
             except Exception:
                 logger.exception("replace failed for %s", document_id)
                 self._audit("replace_failed", document_id, MESSAGES["store_failed"])
-                return
+                raise DocumentError("store_failed") from None
             current.status = "processing"
             current.error = None
             current.title = read_title(data)
             current.year = read_year(data)
             current.source_bytes = len(data)
             self.store.put_record(current)
-            self._index_held(
-                current,
-                data,
-                success_action="replace",
-                failure_action="replace_failed",
-                failure_fallback="Replace failed.",
-                zero_index=False,
-            )
+        self.wake()
 
     def incomplete_ids(self) -> list[str]:
         return [
@@ -248,20 +220,41 @@ class DocumentService:
             if record.status in {"queued", "processing"}
         ]
 
+    def discard_unaccounted(self) -> list[str]:
+        """Delete stored PDFs and index claims that have no catalog row."""
+        removed: list[str] = []
+        with self._lock:
+            known = {record.id for record in self.store.list_records()}
+            for document_id in self.store.list_pdf_ids():
+                if document_id in known:
+                    continue
+                self.store.delete_pdf(document_id)
+                removed.append(document_id)
+            for document_id in self.store.list_index_ids():
+                if document_id in known:
+                    continue
+                self.store.delete_index_claim(document_id)
+                removed.append(document_id)
+        return removed
+
     def watch_incomplete(self, stop: threading.Event, *, pause: float = 15) -> None:
         """Keep trying queued and processing documents until each is ready or failed.
 
+        One document is attempted at a time, oldest upload or retry first.
         A transient error leaves the row processing. The next pass tries it again.
         Another worker holding the claim is skipped until the claim is free.
         """
         not_before: dict[str, float] = {}
         delay_for: dict[str, float] = {}
         while not stop.is_set():
+            outcome = "retry"
+            ran = False
             try:
-                pending = self.incomplete_ids()
+                self.discard_unaccounted()
+                pending = self._in_order(self.incomplete_ids())
             except Exception:
                 logger.exception("could not list documents to index")
-                if stop.wait(pause):
+                if self._wait(stop, pause):
                     return
                 continue
             active = set(pending)
@@ -275,11 +268,12 @@ class DocumentService:
                     return
                 if now < not_before.get(document_id, 0):
                     continue
-                outcome = "retry"
                 try:
                     outcome = self._resume_one(document_id)
                 except Exception:
                     logger.exception("index attempt failed for %s", document_id)
+                    outcome = "retry"
+                ran = True
                 if outcome == "done":
                     not_before.pop(document_id, None)
                     delay_for.pop(document_id, None)
@@ -289,13 +283,17 @@ class DocumentService:
                     delay = delay_for.get(document_id, pause)
                     delay_for[document_id] = min(delay * 2, 300.0)
                     not_before[document_id] = time.monotonic() + delay
-            upcoming = [
-                moment for moment in not_before.values() if moment > time.monotonic()
-            ]
-            wait = pause
-            if upcoming:
-                wait = min(wait, max(0.0, min(upcoming) - time.monotonic()))
-            if stop.wait(wait):
+                break
+            if ran and outcome == "done":
+                wait = 0.0
+            else:
+                upcoming = [
+                    moment for moment in not_before.values() if moment > time.monotonic()
+                ]
+                wait = pause
+                if upcoming:
+                    wait = min(wait, max(0.0, min(upcoming) - time.monotonic()))
+            if self._wait(stop, wait):
                 return
 
     def begin_retry(self, document_id: str) -> None:
@@ -314,6 +312,7 @@ class DocumentService:
             record.error = None
             self.store.put_record(record)
             self._audit("retry", record.id, _label(record))
+        self.wake()
 
     def index_stored(self, document_id: str) -> str:
         record = self.store.get_record(document_id)
@@ -327,14 +326,20 @@ class DocumentService:
             current = self.store.get_record(document_id)
             if current is None or current.status not in {"queued", "processing"}:
                 return "done"
-            return self._index_held(
-                current,
-                data,
-                success_action="processed",
-                failure_action="failed",
-                failure_fallback=MESSAGES["not_pdf"],
-                zero_index=True,
-            )
+            if current.status == "queued":
+                current.status = "processing"
+                current.error = None
+                self.store.put_record(current)
+            record = current
+        success, failure, zero_index = _completion(record)
+        return self._index_held(
+            record,
+            data,
+            success_action=success,
+            failure_action=failure,
+            failure_fallback=MESSAGES["not_pdf"] if zero_index else "Replace failed.",
+            zero_index=zero_index,
+        )
 
     def _resume_one(self, document_id: str) -> str:
         record = self.store.get_record(document_id)
@@ -361,7 +366,8 @@ class DocumentService:
             if claim is None:
                 return "busy"
             info = extract_pdf(data)
-            self._ensure_capacity(info.index_bytes, excluding=record.id)
+            with self._lock:
+                self._ensure_capacity(info.index_bytes, excluding=record.id)
             result = self.ingestor.ingest(
                 data,
                 document_id=record.id,
@@ -369,20 +375,21 @@ class DocumentService:
                 source=record.source,
                 year=record.year,
             )
-            current = self.store.get_record(record.id)
-            if current is None:
-                self.ingestor.delete(record.id)
-                return "done"
-            current.pages = info.pages
-            current.chunk_count = result.chunk_count
-            current.index_bytes = info.index_bytes
-            current.source_bytes = len(data)
-            current.ingested_at = utc_now()
-            current.status = "ready"
-            current.error = None
-            self.store.put_record(current)
-            detail = current.title if success_action == "replace" else _label(current)
-            self._audit(success_action, current.id, detail)
+            with self._lock:
+                current = self.store.get_record(record.id)
+                if current is None:
+                    self.ingestor.delete(record.id)
+                    return "done"
+                current.pages = info.pages
+                current.chunk_count = result.chunk_count
+                current.index_bytes = info.index_bytes
+                current.source_bytes = len(data)
+                current.ingested_at = utc_now()
+                current.status = "ready"
+                current.error = None
+                self.store.put_record(current)
+                detail = current.title if success_action == "replace" else _label(current)
+                self._audit(success_action, current.id, detail)
             return "done"
         except DocumentError as exc:
             message = MESSAGES.get(exc.code, failure_fallback)
@@ -409,21 +416,46 @@ class DocumentService:
         *,
         zero_index: bool,
     ) -> None:
-        record = self.store.get_record(document_id)
-        if record is None:
-            return
-        if zero_index:
-            record.index_bytes = 0
-        record.status = "failed"
-        record.error = message
-        self.store.put_record(record)
-        self._audit(action, record.id, message)
-
-    def _discard_upload(self, document_id: str) -> None:
         with self._lock:
-            self.store.delete_pdf(document_id)
-            if self.store.get_record(document_id) is not None:
-                self.store.delete_record(document_id)
+            record = self.store.get_record(document_id)
+            if record is None:
+                return
+            if zero_index:
+                record.index_bytes = 0
+            record.status = "failed"
+            record.error = message
+            self.store.put_record(record)
+            self._audit(action, record.id, message)
+
+    def _wait(self, stop: threading.Event, seconds: float) -> bool:
+        """Return True when the watcher should stop."""
+        if stop.is_set():
+            return True
+        if seconds <= 0:
+            return False
+        deadline = time.monotonic() + seconds
+        while not stop.is_set():
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return False
+            if self._wake.wait(min(remaining, 0.05)):
+                self._wake.clear()
+                return stop.is_set()
+        return True
+
+    def _in_order(self, document_ids: list[str]) -> list[str]:
+        wanted = set(document_ids)
+        latest: dict[str, str] = {}
+        for event in self.store.list_audit():
+            if event.document_id not in wanted or event.action not in {"upload", "retry"}:
+                continue
+            previous = latest.get(event.document_id)
+            if previous is None or event.id > previous:
+                latest[event.document_id] = event.id
+        return sorted(
+            document_ids,
+            key=lambda document_id: (latest.get(document_id, "~"), document_id),
+        )
 
     def _store_new_pdf(self, document_id: str, data: bytes) -> None:
         self.store.put_pdf(document_id, data)
@@ -455,6 +487,12 @@ class DocumentService:
             detail=detail,
         )
         self.store.put_audit(event)
+
+
+def _completion(record: DocumentRecord) -> tuple[str, str, bool]:
+    if record.ingested_at:
+        return "replace", "replace_failed", False
+    return "processed", "failed", True
 
 
 def _label(record: DocumentRecord) -> str:

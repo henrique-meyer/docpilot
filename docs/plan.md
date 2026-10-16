@@ -453,6 +453,20 @@ A queued or processing document is worked until it is ready or failed. The app k
 
 A transient failure leaves the row processing and the next pass tries again, until the document is ready. A missing file, a file that is not a PDF, or an upload that would pass the index limit marks the row failed. Failed rows still have Retry. Ready rows are left alone.
 
+### DOCPILOT-51 — Index documents off the request path so uploads cannot stall the site
+
+Found Friday 16 October 2026.
+
+Indexing runs in the web process and holds the document lock for the whole ingest. While a file is indexing, the homepage, admin login, health check, and document list stop answering, and the one-second liveness probe kills the replica.
+
+Ingest runs on a dedicated worker, one document at a time. An upload returns as soon as the file is stored. The catalog row and an audit event exist at that moment, and the document list shows the file. Status is `queued`, then `processing`. A failure sets `failed`, which keeps Retry and Delete. Ready rows are left alone. A stored file always has a catalog row. A file in storage that the catalog does not account for is deleted, including files already left behind in the live container.
+
+Startup resumes every `queued` or `processing` document. A missing file, a file that is not a PDF, or an upload that would pass the index limit marks the row failed. Failed rows still have Retry.
+
+The audit table shows the 10 newest events first. Scrolling to the bottom loads 50 more at a time.
+
+This change does not raise the embedding capacity, set a minimum replica, or change the live replica size. The pull request stays unmerged until Henrique says to merge.
+
 ## Issue index
 
 | Key | Summary | Due | URL |
@@ -507,3 +521,4 @@ A transient failure leaves the row processing and the next pass tries again, unt
 | DOCPILOT-48 | Drop the fixed corpus and fixed limits from the docs | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-48 |
 | DOCPILOT-49 | Credit the designer and link the source | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-49 |
 | DOCPILOT-50 | Keep indexing until a document is ready or failed | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-50 |
+| DOCPILOT-51 | Index documents off the request path so uploads cannot stall the site | 2026-10-16 | https://nitro.atlassian.net/browse/DOCPILOT-51 |

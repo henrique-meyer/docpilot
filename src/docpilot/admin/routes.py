@@ -3,7 +3,7 @@
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import APIRouter, BackgroundTasks, File, Form, Request, UploadFile
+from fastapi import APIRouter, File, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
@@ -36,7 +36,7 @@ _TEMPLATES = Environment(
 NOTICES = {
     "upload_queued": "The file is stored. Indexing continues until the status is ready.",
     "retry_queued": "Indexing started again.",
-    "replace_queued": "Replacement started. The previous file stays until the new one is stored.",
+    "replace_queued": "The replacement is stored. Indexing continues until the status is ready.",
     "deleted": "Document deleted.",
     "reset": "Catalog, documents, and the audit log were deleted.",
     "logged_out": "Signed out.",
@@ -471,11 +471,17 @@ def catalog_panel(request: Request) -> Response:
 
 
 @router.get("/admin/api/audit")
-def audit_panel(request: Request) -> Response:
+def audit_panel(request: Request, limit: int = 10) -> Response:
     denied = _require_admin(request)
     if denied is not None:
         return denied
-    return _render("audit_panel.html", audit=_service(request).list_audit())
+    events, total = _service(request).audit_page(limit=limit)
+    return _render(
+        "audit_panel.html",
+        audit=events,
+        audit_total=total,
+        audit_shown=len(events),
+    )
 
 
 @router.get("/admin/api/documents")
@@ -499,7 +505,6 @@ def list_documents(request: Request) -> Response:
 @router.post("/admin/api/documents")
 async def upload_document(
     request: Request,
-    background: BackgroundTasks,
     file: Annotated[UploadFile | None, File()] = None,
     csrf: str = Form(""),
 ) -> Response:
@@ -513,7 +518,6 @@ async def upload_document(
     source = Path(file.filename or "upload.pdf").name if file is not None else "upload.pdf"
     return _queue_upload(
         request,
-        background,
         data=data,
         source=source,
         notice="upload_queued",
@@ -523,7 +527,6 @@ async def upload_document(
 @router.post("/admin/api/documents/url")
 def upload_url(
     request: Request,
-    background: BackgroundTasks,
     url: str = Form(""),
     csrf: str = Form(""),
 ) -> Response:
@@ -539,7 +542,6 @@ def upload_url(
         return _error_response(request, exc.code, 400)
     return _queue_upload(
         request,
-        background,
         data=data,
         source=url.strip(),
         notice="upload_queued",
@@ -550,7 +552,6 @@ def upload_url(
 async def replace_document(
     document_id: str,
     request: Request,
-    background: BackgroundTasks,
     file: Annotated[UploadFile | None, File()] = None,
     csrf: str = Form(""),
 ) -> Response:
@@ -561,15 +562,11 @@ async def replace_document(
     if denied is not None:
         return denied
     data = await file.read() if file is not None else b""
-    service = _service(request)
     try:
-        service.validate_upload(data)
-        if service.store.get_record(document_id) is None:
-            raise DocumentError("not_found")
+        _service(request).begin_replace(document_id, data)
     except DocumentError as exc:
         status = 404 if exc.code == "not_found" else 400
         return _error_response(request, exc.code, status)
-    background.add_task(service.finish_replace, document_id, data)
     return _accepted(request, "replace_queued")
 
 
@@ -577,7 +574,6 @@ async def replace_document(
 def retry_document(
     document_id: str,
     request: Request,
-    background: BackgroundTasks,
     csrf: str = Form(""),
 ) -> Response:
     denied = _require_admin(request)
@@ -596,7 +592,6 @@ def retry_document(
         else:
             status = 400
         return _error_response(request, exc.code, status)
-    background.add_task(_service(request).index_stored, document_id)
     return _accepted(request, "retry_queued")
 
 
@@ -719,7 +714,6 @@ def _delete(document_id: str, request: Request, csrf: str) -> Response:
 
 def _queue_upload(
     request: Request,
-    background: BackgroundTasks,
     *,
     data: bytes,
     source: str,
@@ -730,7 +724,6 @@ def _queue_upload(
         record = service.accept_upload(data, source=source)
     except DocumentError as exc:
         return _error_response(request, exc.code, 400)
-    background.add_task(service.finish_upload, record.id, data)
     return _accepted(request, notice, record.to_json())
 
 

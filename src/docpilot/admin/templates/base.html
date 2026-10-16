@@ -154,6 +154,7 @@
     #catalog-panel { overflow-x: auto; }
     #catalog-panel table { width: 100%; }
     #catalog-panel .nowrap { white-space: nowrap; }
+    #audit-panel .audit-scroll { max-height: 18rem; overflow-y: auto; }
     button.icon {
       background: transparent;
       color: var(--danger);
@@ -216,6 +217,8 @@
       var loadGeneration = 0;
       var FAST_MS = 2000;
       var IDLE_MS = 30000;
+      var auditLimit = 10;
+      var auditScroll = 0;
 
       function pageBanner() {
         return document.getElementById("page-banner");
@@ -381,6 +384,10 @@
       function loadPanel(id, url, generation) {
         var panel = document.getElementById(id);
         if (!panel) return Promise.resolve();
+        if (id === "audit-panel") {
+          var existing = panel.querySelector(".audit-scroll");
+          if (existing) auditScroll = existing.scrollTop;
+        }
         return fetch(url, {
           headers: { "Accept": "text/html" },
           credentials: "same-origin"
@@ -394,6 +401,7 @@
           current.innerHTML = html;
           current.removeAttribute("aria-busy");
           formatLocalTimes(current);
+          if (id === "audit-panel") bindAuditScroll(current);
         }).catch(function () {
           if (generation !== loadGeneration) return;
           var current = document.getElementById(id);
@@ -403,13 +411,32 @@
         });
       }
 
+      function auditUrl() {
+        return "/admin/api/audit?limit=" + auditLimit;
+      }
+
+      function bindAuditScroll(panel) {
+        var box = panel.querySelector(".audit-scroll");
+        if (!box) return;
+        box.scrollTop = auditScroll;
+        box.addEventListener("scroll", function () {
+          if (box.dataset.loading === "1") return;
+          if (!box.querySelector(".audit-more")) return;
+          if (box.scrollTop + box.clientHeight < box.scrollHeight - 8) return;
+          box.dataset.loading = "1";
+          auditLimit += 50;
+          var generation = loadGeneration;
+          loadPanel("audit-panel", auditUrl(), generation);
+        });
+      }
+
       function loadPanels() {
         if (!document.getElementById("catalog-panel")) return Promise.resolve();
         var generation = ++loadGeneration;
         return Promise.all([
           loadPanel("usage-panel", "/admin/api/usage", generation),
           loadPanel("catalog-panel", "/admin/api/catalog", generation),
-          loadPanel("audit-panel", "/admin/api/audit", generation)
+          loadPanel("audit-panel", auditUrl(), generation)
         ]).then(function () {
           if (generation === loadGeneration) schedulePoll();
         });

@@ -63,7 +63,9 @@ def _app(
         store or MemoryDocumentStore(),
         asker,
     )
-    return TestClient(application)
+    client = TestClient(application)
+    client.__enter__()
+    return client
 
 
 def _csrf(page: str) -> str:
@@ -82,8 +84,24 @@ def _sign_in(client: TestClient, password: str = PASSWORD) -> str:
     )
     assert response.status_code == 303
     page = client.get("/admin")
-    assert page.status_code == 200
     return _csrf(page.text)
+
+
+def _wait_record(
+    store: MemoryDocumentStore | FileDocumentStore,
+    document_id: str,
+    ready,
+    timeout: float = 5,
+) -> DocumentRecord:
+    deadline = time.monotonic() + timeout
+    record = store.get_record(document_id)
+    while time.monotonic() < deadline:
+        record = store.get_record(document_id)
+        if record is not None and ready(record):
+            return record
+        time.sleep(0.02)
+    assert record is not None and ready(record)
+    return record
 
 
 def test_dotenv_fills_only_missing_names(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
@@ -235,13 +253,17 @@ def test_upload_replace_and_delete(tmp_path: Path) -> None:
         follow_redirects=False,
     )
     assert uploaded.status_code == 303
+    stored = store.list_records()[0]
+    assert stored.title == "2026 Visitor guide"
+    assert stored.year == "2026"
+    ready = _wait_record(store, stored.id, lambda item: item.status == "ready")
     catalog = client.get("/admin/api/documents").json()
     assert catalog["documents"][0]["title"] == "2026 Visitor guide"
     assert catalog["documents"][0]["year"] == "2026"
     assert catalog["documents"][0]["status"] == "ready"
     assert catalog["documents"][0]["pages"] == 1
     assert catalog["documents"][0]["chunk_count"] == 0
-    document_id = catalog["documents"][0]["id"]
+    document_id = ready.id
     assert store.pdfs[document_id].startswith(b"%PDF-")
 
     page = client.get("/admin")
@@ -253,6 +275,11 @@ def test_upload_replace_and_delete(tmp_path: Path) -> None:
         follow_redirects=False,
     )
     assert replaced.status_code == 303
+    _wait_record(
+        store,
+        document_id,
+        lambda item: item.status == "ready" and item.pages == 2,
+    )
     catalog = client.get("/admin/api/documents").json()
     assert catalog["documents"][0]["title"] == "2024 Replacement"
     assert catalog["documents"][0]["year"] == "2024"
@@ -509,33 +536,44 @@ def test_upload_stops_at_the_index_limit(tmp_path: Path, monkeypatch: MonkeyPatc
         "/admin/api/documents",
         data={"csrf": csrf},
         files={"file": ("a.pdf", _pdf(title="First"), "application/pdf")},
-        follow_redirects=True,
+        headers={"Accept": "application/json"},
     )
-    assert first.status_code == 200
-    csrf = _csrf(first.text)
+    assert first.status_code == 202
+    ready = _wait_record(store, first.json()["id"], lambda item: item.status == "ready")
+    assert ready.title == "First"
+    assert ready.index_bytes == 40
     second = client.post(
         "/admin/api/documents",
         data={"csrf": csrf},
         files={"file": ("b.pdf", _pdf(title="Second"), "application/pdf")},
-        follow_redirects=True,
+        headers={"Accept": "application/json"},
     )
-    assert second.status_code == 200
-    assert "pass the 50 MB index limit" in second.text
-    documents = client.get("/admin/api/documents").json()["documents"]
-    assert [item["title"] for item in documents] == ["First"]
-    assert documents[0]["status"] == "ready"
-    assert len(store.pdfs) == 1
-    csrf = _csrf(client.get("/admin").text)
-    rejected = client.post(
+    assert second.status_code == 202
+    failed = _wait_record(store, second.json()["id"], lambda item: item.status == "failed")
+    assert failed.error == "That upload would pass the 50 MB index limit."
+    assert store.pdfs[failed.id].startswith(b"%PDF-")
+    catalog = client.get("/admin/api/catalog")
+    assert "Second" in catalog.text
+    assert f'/admin/api/documents/{failed.id}/retry' in catalog.text
+    assert f'/admin/api/documents/{failed.id}/delete' in catalog.text
+    third = client.post(
         "/admin/api/documents",
         data={"csrf": csrf},
         files={"file": ("c.pdf", _pdf(title="Third"), "application/pdf")},
         headers={"Accept": "application/json"},
     )
-    assert rejected.status_code == 400
-    assert rejected.json()["error"] == "over_capacity"
-    assert len(store.list_records()) == 1
-    assert len(store.pdfs) == 1
+    assert third.status_code == 202
+    third_row = _wait_record(store, third.json()["id"], lambda item: item.status == "failed")
+    assert third_row.error == "That upload would pass the 50 MB index limit."
+    assert len(store.list_records()) == 3
+    removed = client.post(
+        f"/admin/api/documents/{third_row.id}/delete",
+        data={"csrf": csrf},
+        headers={"Accept": "application/json"},
+    )
+    assert removed.status_code == 200
+    assert store.get_record(third_row.id) is None
+    assert third_row.id not in store.pdfs
 
     def url_pdf(_url: str, _limit: int) -> bytes:
         return _pdf(title="From URL")
@@ -546,10 +584,10 @@ def test_upload_stops_at_the_index_limit(tmp_path: Path, monkeypatch: MonkeyPatc
         data={"csrf": csrf, "url": "https://example.gov/guide.pdf"},
         headers={"Accept": "application/json"},
     )
-    assert by_url.status_code == 400
-    assert by_url.json()["error"] == "over_capacity"
-    assert len(store.list_records()) == 1
-    assert len(store.pdfs) == 1
+    assert by_url.status_code == 202
+    from_url = _wait_record(store, by_url.json()["id"], lambda item: item.status == "failed")
+    assert from_url.error == "That upload would pass the 50 MB index limit."
+    assert store.get_pdf(from_url.id) is not None
 
 
 def test_private_urls_are_refused(tmp_path: Path) -> None:
@@ -580,6 +618,8 @@ def test_file_store_round_trip(tmp_path: Path) -> None:
         data={"csrf": csrf},
         files={"file": ("disk.pdf", _pdf(title="On disk"), "application/pdf")},
     )
+    stored = store.list_records()[0]
+    _wait_record(store, stored.id, lambda item: item.status == "ready")
     restored = FileDocumentStore(tmp_path)
     records = restored.list_records()
     assert records[0].title == "On disk"
@@ -947,6 +987,8 @@ def test_catalog_audit_and_usage_load_on_their_own(tmp_path: Path) -> None:
         follow_redirects=False,
     )
     assert uploaded.status_code == 303
+    stored = store.list_records()[0]
+    _wait_record(store, stored.id, lambda item: item.status == "ready")
     page = client.get("/admin")
     assert 'id="usage-panel"' in page.text
     assert 'id="catalog-panel"' in page.text
@@ -1319,11 +1361,118 @@ def test_failed_document_can_be_retried_from_the_catalog(tmp_path: Path) -> None
     )
     assert retried.status_code == 202
     assert retried.json()["message"] == "Indexing started again."
-    done = store.get_record(failed.id)
-    assert done is not None
+    done = _wait_record(store, failed.id, lambda item: item.status == "ready")
     assert done.status == "ready"
     assert store.pdfs[failed.id] == data
     actions = [event.action for event in store.audit]
     assert "retry" in actions
     assert "processed" in actions
     assert ">Retry<" not in client.get("/admin/api/catalog").text
+
+
+def test_two_uploads_return_before_ingest_finishes(tmp_path: Path) -> None:
+    store = MemoryDocumentStore()
+    client = _app(tmp_path, store)
+    csrf = _sign_in(client)
+    gate = threading.Event()
+    started: list[str] = []
+    original = client.app.state.documents.ingestor.ingest
+
+    def ingest(data: bytes, **kwargs: object) -> IngestResult:
+        started.append(str(kwargs["document_id"]))
+        assert gate.wait(5)
+        return original(data, **kwargs)
+
+    client.app.state.documents.ingestor.ingest = ingest  # type: ignore[method-assign]
+    first = client.post(
+        "/admin/api/documents",
+        data={"csrf": csrf},
+        files={"file": ("a.pdf", _pdf(title="First guide"), "application/pdf")},
+        headers={"Accept": "application/json"},
+    )
+    assert first.status_code == 202
+    deadline = time.monotonic() + 5
+    while not started and time.monotonic() < deadline:
+        time.sleep(0.02)
+    assert started
+    began = time.monotonic()
+    second = client.post(
+        "/admin/api/documents",
+        data={"csrf": csrf},
+        files={"file": ("b.pdf", _pdf(title="Second guide"), "application/pdf")},
+        headers={"Accept": "application/json"},
+    )
+    assert second.status_code == 202
+    assert time.monotonic() - began < 1
+    assert "location" not in second.headers
+    records = {record.id: record for record in store.list_records()}
+    assert set(records) == {first.json()["id"], second.json()["id"]}
+    assert all(record.status in {"queued", "processing"} for record in records.values())
+    assert [event.action for event in store.list_audit()].count("upload") == 2
+    catalog = client.get("/admin/api/catalog")
+    assert "First guide" in catalog.text
+    assert "Second guide" in catalog.text
+    health_at = time.monotonic()
+    assert client.get("/health").json() == {"status": "ok"}
+    assert time.monotonic() - health_at < 1
+    gate.set()
+    for document_id in records:
+        _wait_record(store, document_id, lambda item: item.status == "ready")
+
+
+def test_unaccounted_blobs_are_deleted_on_startup(tmp_path: Path) -> None:
+    store = FileDocumentStore(tmp_path)
+    store.put_pdf("loose", b"%PDF-1.4 loose")
+    store.put_pdf("kept", _pdf(title="Kept guide"))
+    store.put_record(_stored("kept", "ready", title="Kept guide", source="kept.pdf"))
+    claim = tmp_path / "indexing" / "loose-claim"
+    claim.parent.mkdir()
+    claim.write_text("x", encoding="utf-8")
+    with TestClient(create_app(_settings(tmp_path), store)) as client:
+        assert client.get("/health").json() == {"status": "ok"}
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline and "loose" in store.list_pdf_ids():
+            time.sleep(0.02)
+    assert store.list_pdf_ids() == ["kept"]
+    assert store.get_record("kept") is not None
+    assert not claim.exists()
+
+
+def test_audit_table_starts_at_ten_and_loads_fifty_more(tmp_path: Path) -> None:
+    store = MemoryDocumentStore()
+    for number in range(70):
+        store.put_audit(
+            AuditEvent(
+                id=f"20261016T000000{number:06d}-aaaaaaaa",
+                at="2026-10-16T00:00:00+00:00",
+                actor="admin",
+                action="upload",
+                document_id=None,
+                detail=f"event-{number}",
+            )
+        )
+    client = _app(tmp_path, store)
+    csrf = _sign_in(client)
+    del csrf
+    page = client.get("/admin")
+    assert "audit-scroll" in page.text
+    assert "auditLimit += 50" in page.text
+    assert "#audit-panel .audit-scroll { max-height: 18rem; overflow-y: auto; }" in page.text
+    first = client.get("/admin/api/audit")
+    assert first.status_code == 200
+    assert 'data-shown="10"' in first.text
+    assert 'data-total="70"' in first.text
+    assert first.text.count("<tr>") == 11
+    assert "event-69" in first.text
+    assert "event-60" in first.text
+    assert "event-59" not in first.text
+    assert "Scroll to load more." in first.text
+    wider = client.get("/admin/api/audit?limit=60")
+    assert wider.text.count("<tr>") == 61
+    assert "event-10" in wider.text
+    assert "event-9" not in wider.text
+    assert "Scroll to load more." in wider.text
+    whole = client.get("/admin/api/audit?limit=110")
+    assert whole.text.count("<tr>") == 71
+    assert "event-0" in whole.text
+    assert "Scroll to load more." not in whole.text

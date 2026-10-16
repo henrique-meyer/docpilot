@@ -50,6 +50,12 @@ class DocumentStore(Protocol):
 
     def list_audit(self) -> list[AuditEvent]: ...
 
+    def list_pdf_ids(self) -> list[str]: ...
+
+    def list_index_ids(self) -> list[str]: ...
+
+    def delete_index_claim(self, document_id: str) -> None: ...
+
     def get_summary(self) -> CatalogSummary | None: ...
 
     def put_summary(self, summary: CatalogSummary) -> None: ...
@@ -114,6 +120,15 @@ class MemoryDocumentStore:
 
     def list_audit(self) -> list[AuditEvent]:
         return list(self.audit)
+
+    def list_pdf_ids(self) -> list[str]:
+        return sorted(self.pdfs)
+
+    def list_index_ids(self) -> list[str]:
+        return []
+
+    def delete_index_claim(self, document_id: str) -> None:
+        del document_id
 
     def get_summary(self) -> CatalogSummary | None:
         return self.summary
@@ -182,6 +197,21 @@ class FileDocumentStore:
             events.append(audit_from_json(json.loads(path.read_text(encoding="utf-8"))))
         return events
 
+    def list_pdf_ids(self) -> list[str]:
+        folder = self.root / "pdfs"
+        if not folder.is_dir():
+            return []
+        return sorted(path.stem for path in folder.glob("*.pdf") if path.is_file())
+
+    def list_index_ids(self) -> list[str]:
+        folder = self.root / "indexing"
+        if not folder.is_dir():
+            return []
+        return sorted(path.name for path in folder.iterdir() if path.is_file())
+
+    def delete_index_claim(self, document_id: str) -> None:
+        (self.root / "indexing" / document_id).unlink(missing_ok=True)
+
     def get_summary(self) -> CatalogSummary | None:
         path = self.root / "catalog-summary.json"
         if not path.is_file():
@@ -217,8 +247,8 @@ class FileDocumentStore:
                 continue
             for path in directory.iterdir():
                 if path.is_file():
-                    path.unlink()
-        (self.root / "catalog-summary.json").unlink(missing_ok=True)
+                    _unlink_retry(path)
+        _unlink_retry(self.root / "catalog-summary.json")
 
     def _write_json(self, path: Path, payload: object) -> None:
         temporary = path.with_name(f"{path.name}.tmp")
@@ -302,6 +332,15 @@ class AzureBlobStore:
             if payload is not None:
                 events.append(audit_from_json(json.loads(payload)))
         return events
+
+    def list_pdf_ids(self) -> list[str]:
+        return _ids_under(self._names("documents/"), "documents/", ".pdf")
+
+    def list_index_ids(self) -> list[str]:
+        return _ids_under(self._names("indexing/"), "indexing/", "")
+
+    def delete_index_claim(self, document_id: str) -> None:
+        self._delete(f"indexing/{document_id}")
 
     def get_summary(self) -> CatalogSummary | None:
         payload = self._download("catalog-summary.json")
@@ -401,6 +440,34 @@ class AzureBlobStore:
             if isinstance(name, str):
                 names.append(name)
         return sorted(names)
+
+
+def _unlink_retry(path: Path) -> None:
+    delay = 0.01
+    for attempt in range(8):
+        try:
+            path.unlink(missing_ok=True)
+            return
+        except PermissionError:
+            if attempt == 7:
+                raise
+            time.sleep(delay)
+            delay = min(delay * 2, 0.2)
+
+
+def _ids_under(names: list[str], prefix: str, suffix: str) -> list[str]:
+    found: list[str] = []
+    for name in names:
+        if not name.startswith(prefix):
+            continue
+        ident = name[len(prefix) :]
+        if suffix:
+            if not ident.endswith(suffix):
+                continue
+            ident = ident[: -len(suffix)]
+        if ident and "/" not in ident:
+            found.append(ident)
+    return found
 
 
 class _FileClaim:
