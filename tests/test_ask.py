@@ -133,6 +133,17 @@ def test_daily_token_cap_returns_the_demo_message(tmp_path: Path) -> None:
     assert second.json()["answer"] == "demo limit reached"
 
 
+def test_answer_markdown_renders_and_citations_are_smaller(tmp_path: Path) -> None:
+    page = _client(tmp_path, Asker(None, None)).get("/")
+    text = page.text
+    assert "function renderAnswer" in text
+    assert 'text.startsWith("**"' in text
+    assert "answer.textContent = body.answer" not in text
+    assert "font-size: 0.88em" in text
+    citation = text.index(".citation {")
+    assert "font-size: 0.88em" in text[citation:citation + 180]
+
+
 def test_enter_submits_the_ask_box(tmp_path: Path) -> None:
     client = _client(tmp_path, Asker(None, None))
     page = client.get("/")
