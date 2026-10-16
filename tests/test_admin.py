@@ -1013,6 +1013,7 @@ def test_catalog_audit_and_usage_load_on_their_own(tmp_path: Path) -> None:
     assert "extracted text" in usage.text
     assert "Source files stored:" in usage.text
     assert 'aria-label="Extracted text toward the index limit"' in usage.text
+    assert "The bar shows the search index size against the service storage quota." in page.text
     assert catalog.status_code == 200
     assert "2026 Visitor guide" in catalog.text
     assert "status-ready" in catalog.text
@@ -1040,6 +1041,25 @@ def test_catalog_audit_and_usage_load_on_their_own(tmp_path: Path) -> None:
     assert outsider.get("/admin/api/usage").status_code == 401
     assert outsider.get("/admin/api/catalog").status_code == 401
     assert outsider.get("/admin/api/audit").status_code == 401
+
+
+def test_usage_meter_shows_search_storage_when_the_index_reports_it(tmp_path: Path) -> None:
+    client = _app(tmp_path)
+    _sign_in(client)
+
+    class _Index:
+        def storage_usage(self) -> tuple[int, int]:
+            return 56_079_230, 52_428_800
+
+    client.app.state.documents.ingestor.index = _Index()
+    usage = client.get("/admin/api/usage")
+    assert usage.status_code == 200
+    assert "53.5 MB" in usage.text
+    assert "of 50.0 MB search index" in usage.text
+    assert 'style="width: 100%"' in usage.text
+    assert 'aria-valuenow="52428800"' in usage.text
+    assert 'aria-label="Search index toward the storage quota"' in usage.text
+    assert "extracted text" not in usage.text
 
 
 class _DraftChat:

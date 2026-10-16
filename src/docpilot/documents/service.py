@@ -2,7 +2,8 @@
 
 A stored PDF is chunked and upserted. When Azure AI Search is not configured,
 chunks stay in a process-local index. Old chunk ids are removed only after the
-new chunks are upserted. The 50 MB cap uses extracted text size.
+new chunks are upserted. The upload cap uses extracted text size. The usage
+meter reads search index storage when the index can report it.
 """
 
 import logging
@@ -110,6 +111,21 @@ class DocumentService:
             self.store.put_summary(saved)
             self._audit("catalog_summary", None, "Catalog summary saved")
         return saved
+
+    def usage_meter(self) -> tuple[int, int, str]:
+        """Bytes used, the quota, and the label for the admin meter.
+
+        A search service reports its own index storage and quota. Without one,
+        the meter stays on extracted text and the configured limit.
+        """
+        index = self.ingestor.index
+        reader = getattr(index, "storage_usage", None)
+        if reader is not None:
+            measured = reader()
+            if measured is not None:
+                used, quota = measured
+                return used, quota, "search index"
+        return self.index_bytes_used(), self.settings.index_limit_bytes, "extracted text"
 
     def index_bytes_used(self, excluding: str | None = None) -> int:
         total = 0

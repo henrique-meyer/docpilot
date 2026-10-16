@@ -446,13 +446,14 @@ def usage_panel(request: Request) -> Response:
     if denied is not None:
         return denied
     service = _service(request)
-    used = service.index_bytes_used()
-    limit = service.settings.index_limit_bytes
+    used, limit, label = service.usage_meter()
     return _render(
         "usage_panel.html",
         index_bytes=used,
         source_bytes=service.source_bytes_used(),
         index_limit=limit,
+        meter_now=min(used, limit),
+        meter_label=label,
         percent=_percent(used, limit),
     )
 
