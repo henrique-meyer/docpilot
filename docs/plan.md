@@ -467,6 +467,16 @@ The audit table shows the 10 newest events first. Scrolling to the bottom loads 
 
 This change does not raise the embedding capacity, set a minimum replica, or change the live replica size. The pull request stays unmerged until Henrique says to merge.
 
+### DOCPILOT-52 — Raise embedding capacity so a handful of documents index in minutes
+
+Found Friday 16 October 2026.
+
+The embeddings deployment is Data Zone Standard at capacity 10: 10,000 tokens per minute and 10 requests per minute. Ingest sends 16 chunks per call, and one call already exceeds that token budget, so each call waits on a 429.
+
+Raise `text-embedding-3-small` to capacity 500: 500,000 tokens per minute and 500 requests per minute. A few handfuls of documents then embed in minutes. The Data Zone quota limit is 1,000 and current use is 20, so 500 fits without a quota request. Tokens stay pay-as-you-go. Capacity is a rate limit.
+
+Update `infra/main.bicep` and the setup guide so the next deploy keeps 500. Apply only this deployment in Azure. Do not change the Azure AI Search SKU. Do not change the container replica size or CPU.
+
 ## Issue index
 
 | Key | Summary | Due | URL |
@@ -522,3 +532,4 @@ This change does not raise the embedding capacity, set a minimum replica, or cha
 | DOCPILOT-49 | Credit the designer and link the source | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-49 |
 | DOCPILOT-50 | Keep indexing until a document is ready or failed | 2026-10-15 | https://nitro.atlassian.net/browse/DOCPILOT-50 |
 | DOCPILOT-51 | Index documents off the request path so uploads cannot stall the site | 2026-10-16 | https://nitro.atlassian.net/browse/DOCPILOT-51 |
+| DOCPILOT-52 | Raise embedding capacity so a handful of documents index in minutes | 2026-10-16 | https://nitro.atlassian.net/browse/DOCPILOT-52 |

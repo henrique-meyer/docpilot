@@ -62,7 +62,7 @@ Two deployments on the account:
 | Deployment name | Model | Version | SKU | Capacity |
 | --- | --- | --- | --- | --- |
 | `gpt-6.1-sol` | gpt-6.1-sol | 2026-09-29 | Data Zone Standard | 50 |
-| `text-embedding-3-small` | text-embedding-3-small | 1 | Data Zone Standard | 10 |
+| `text-embedding-3-small` | text-embedding-3-small | 1 | Data Zone Standard | 500 |
 
 Chat and the judge call `gpt-6.1-sol`. Embeddings call `text-embedding-3-small` and request 512 dimensions. If you name a deployment something else, put that name in the matching variable in `.env`.
 
