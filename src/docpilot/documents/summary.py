@@ -18,6 +18,7 @@ from docpilot.ingest.pdftext import read_pages
 
 EXCERPT_CHARS = 1800
 PROMPT_CHARS = 12000
+SUMMARY_OPENING = "The uploaded set of documents contains"
 
 
 class Chat(Protocol):
@@ -39,7 +40,7 @@ def parse_proposal(text: str) -> CatalogSummary:
         raise DocumentError("draft_failed")
     payload = cast(dict[object, object], loaded)
     title = _clip(_text_field(payload, "title"), TITLE_LIMIT)
-    summary = _clip(_text_field(payload, "summary"), SUMMARY_LIMIT)
+    summary = _with_opening(_text_field(payload, "summary"))
     questions = payload.get("questions")
     if not isinstance(questions, list) or len(questions) != 3:
         raise DocumentError("draft_failed")
@@ -97,7 +98,8 @@ def _prompt(excerpts: str) -> str:
         "Return JSON with keys title, summary, and questions.\n"
         "title: one line naming what all of the documents have in common.\n"
         "summary: two or three sentences on what the set contains, "
-        "so a visitor knows what to ask.\n"
+        "so a visitor knows what to ask. "
+        f'The summary starts with "{SUMMARY_OPENING}".\n'
         "questions: exactly three short questions a visitor could ask "
         "that these documents can answer. Make each one specific to the text.\n"
         "JSON only.\n\n"
@@ -126,6 +128,23 @@ def _text_field(payload: dict[object, object], key: str) -> str:
     if not isinstance(value, str):
         raise DocumentError("draft_failed")
     return value
+
+
+def _with_opening(summary: str) -> str:
+    text = " ".join(summary.split()).strip()
+    prefix = SUMMARY_OPENING.casefold()
+    if text.casefold().startswith(prefix):
+        rest = text[len(SUMMARY_OPENING) :].lstrip(" \t:-—")
+        text = f"{SUMMARY_OPENING} {rest}".strip() if rest else SUMMARY_OPENING
+    elif text:
+        text = f"{SUMMARY_OPENING} {_uncapitalize(text)}"
+    return _clip(text, SUMMARY_LIMIT)
+
+
+def _uncapitalize(text: str) -> str:
+    if len(text) >= 2 and text[0].isupper() and text[1].islower():
+        return text[0].lower() + text[1:]
+    return text
 
 
 def _clip(value: str, limit: int) -> str:

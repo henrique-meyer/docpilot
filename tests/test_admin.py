@@ -1185,6 +1185,11 @@ def test_catalog_summary_draft_fills_the_form_and_does_not_save(
     assert drafted.status_code == 200
     body = drafted.json()
     assert body["title"] == "IRS Publications for use in preparing 2025 returns"
+    assert body["summary"] == (
+        "The uploaded set of documents contains these documents provide guidance "
+        "for filing 2025 personal tax returns."
+    )
+    assert "The uploaded set of documents contains" in chat.prompts[0]
     assert body["questions"][0] == "Do dead people have to file taxes?"
     assert "message" not in body
     assert store.get_summary() is None
@@ -1198,6 +1203,17 @@ def test_catalog_summary_draft_fills_the_form_and_does_not_save(
         "/admin/api/catalog-summary/draft",
         headers={"Accept": "application/json"},
     ).status_code == 401
+
+
+def test_catalog_summary_keeps_an_opening_the_model_already_wrote() -> None:
+    from docpilot.documents.summary import parse_proposal
+
+    kept = parse_proposal(
+        '{"title":"Tax guides",'
+        '"summary":"The uploaded set of documents contains: IRS publications.",'
+        '"questions":["One?","Two?","Three?"]}'
+    )
+    assert kept.summary == "The uploaded set of documents contains IRS publications."
 
 
 def test_catalog_summary_draft_refuses_an_empty_catalog(tmp_path: Path) -> None:
