@@ -551,6 +551,18 @@ Found Saturday 17 October 2026.
 
 While an answer is loading, the question box and Ask stay disabled. A spinner sits in the empty space immediately to the right of Ask. Hide the spinner when the request finishes, including when it fails. A second submit during the wait does not start another request.
 
+### DOCPILOT-62 — Add a View Documents page
+
+Found Saturday 17 October 2026.
+
+At the end of the catalog summary paragraph on the ask page, add a link that says "View Documents". It goes to /documents. That page has the same title and description card and no sample questions. Under the summary, a link says "Ask about these documents" and goes to the main page. Under the divider, list every uploaded document as a link. Clicking opens a new tab named document_ plus the document id, so opening the same document again reloads that tab instead of opening another. A name that starts with an underscore is reserved by the browser and would open a new tab every time. The link uses the app source endpoint, not a public storage URL. The list opens on the first page. Citation links still open on the cited page.
+
+### DOCPILOT-63 — Drop the blank section from a citation line
+
+Found Saturday 17 October 2026.
+
+The citation line is "document — section, p. page". When the section is empty the page shows "2025 Publication 525 — , p. 36". Omit the em dash, the blank section, and that comma when there is no section, so the line is "2025 Publication 525, p. 36". When a section is present, keep "Title — Section, p. N".
+
 ## Issue index
 
 | Key | Summary | Due | URL |
@@ -616,3 +628,5 @@ While an answer is loading, the question box and Ask stay disabled. A spinner si
 | DOCPILOT-59 | Disable the question box and Ask while an answer is loading | 2026-10-17 | https://nitro.atlassian.net/browse/DOCPILOT-59 |
 | DOCPILOT-60 | Open a citation on the source page | 2026-10-17 | https://nitro.atlassian.net/browse/DOCPILOT-60 |
 | DOCPILOT-61 | Show a spinner beside Ask while an answer is loading | 2026-10-17 | https://nitro.atlassian.net/browse/DOCPILOT-61 |
+| DOCPILOT-62 | Add a View Documents page | 2026-10-17 | https://nitro.atlassian.net/browse/DOCPILOT-62 |
+| DOCPILOT-63 | Drop the blank section from a citation line | 2026-10-17 | https://nitro.atlassian.net/browse/DOCPILOT-63 |
