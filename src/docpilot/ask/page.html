@@ -77,6 +77,9 @@
     .catalog-summary p { margin: 0 0 8px; }
     .catalog-summary ul { margin: 0; padding-left: 1.2rem; }
     .catalog-summary li { margin: 4px 0; }
+    .catalog-summary a, .document-list a { color: var(--navy); }
+    .document-list { list-style: none; margin: 0; padding: 0; }
+    .document-list li { margin: 8px 0; }
     .disclaimer, .site-credit { color: var(--muted); font-size: 0.92rem; }
     .site-credit { margin: 16px 0 0; }
     .site-credit a { color: inherit; white-space: nowrap; }
@@ -106,7 +109,7 @@
       {% if show_summary %}
       <div class="catalog-summary">
         {% if summary.title %}<h1>{{ summary.title }}</h1>{% endif %}
-        {% if summary.summary %}<p>{{ summary.summary }}</p>{% endif %}
+        {% if summary.summary %}<p>{{ summary.summary }} <a href="/documents">View Documents</a></p>{% endif %}
         {% if questions %}
         <p>Sample questions</p>
         <ul>

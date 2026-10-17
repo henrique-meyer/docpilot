@@ -232,6 +232,63 @@ def test_home_page_credits_the_designer(tmp_path: Path) -> None:
     assert "Cursor" not in text
 
 
+def test_documents_page_lists_uploads_and_reuses_a_named_tab(tmp_path: Path) -> None:
+    store = MemoryDocumentStore()
+    first = "a" * 32
+    second = "b" * 32
+    store.put_record(
+        DocumentRecord(
+            id=first,
+            title="2025 Publication 502",
+            source="p502.pdf",
+            year="2025",
+            pages=27,
+            chunk_count=1,
+            index_bytes=10,
+            source_bytes=8,
+            ingested_at=None,
+            status="ready",
+        )
+    )
+    store.put_record(
+        DocumentRecord(
+            id=second,
+            title="",
+            source="notes.pdf",
+            year=None,
+            pages=1,
+            chunk_count=0,
+            index_bytes=0,
+            source_bytes=4,
+            ingested_at=None,
+            status="ready",
+        )
+    )
+    client = TestClient(create_app(_settings(tmp_path), store, Asker(None, None)))
+    client.app.state.documents.save_summary(
+        "IRS Publications for Preparing 2025 Returns",
+        "These documents provide guidance for filing 2025 personal tax returns.",
+        ("Do dead people have to file taxes?", "Second question", "Third question"),
+    )
+    home = client.get("/")
+    assert 'href="/documents">View Documents</a>' in home.text
+    assert home.text.index("These documents provide guidance") < home.text.index("View Documents")
+    page = client.get("/documents")
+    assert page.status_code == 200
+    assert page.headers["cache-control"] == "no-store"
+    text = page.text
+    assert "<h1>IRS Publications for Preparing 2025 Returns</h1>" in text
+    assert "These documents provide guidance for filing 2025 personal tax returns." in text
+    assert "Sample questions" not in text
+    assert "<li>" not in text.split('class="document-list"')[0]
+    assert 'href="/">Ask about these documents</a>' in text
+    assert text.index("Ask about these documents") < text.index('class="document-list"')
+    assert f'href="/sources/{first}#page=1" target="document_{first}">2025 Publication 502</a>' in text
+    assert f'href="/sources/{second}#page=1" target="document_{second}">notes.pdf</a>' in text
+    assert "2025</a>" not in text
+    assert "blob.core.windows.net" not in text
+
+
 def test_home_page_states_the_disclaimer(tmp_path: Path) -> None:
     client = _client(tmp_path, Asker(None, None))
     page = client.get("/")
@@ -267,7 +324,7 @@ def test_home_page_shows_the_catalog_summary_above_the_ask_box(tmp_path: Path) -
     escaped = client.get("/").text
     assert "<h1>&lt;script&gt;</h1>" in escaped
     assert "<h1><script>" not in escaped
-    assert "<p>a &amp; b</p>" in escaped
+    assert "<p>a &amp; b <a href=\"/documents\">View Documents</a></p>" in escaped
 
 
 class BrokenChat:

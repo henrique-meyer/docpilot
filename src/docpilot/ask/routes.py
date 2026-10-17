@@ -62,6 +62,17 @@ def home(request: Request) -> HTMLResponse:
     return HTMLResponse(body, headers={"Cache-Control": "no-store"})
 
 
+@router.get("/documents", response_class=HTMLResponse)
+def documents_page(request: Request) -> HTMLResponse:
+    service = _documents(request)
+    summary = service.get_summary()
+    body = _TEMPLATES.get_template("documents.html").render(
+        summary=summary,
+        documents=service.list_documents(),
+    )
+    return HTMLResponse(body, headers={"Cache-Control": "no-store"})
+
+
 @router.get("/sources/{document_id}")
 def source_pdf(document_id: str, request: Request) -> Response:
     if _SOURCE_ID.fullmatch(document_id) is None:
