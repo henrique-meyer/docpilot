@@ -144,6 +144,21 @@ def test_answer_markdown_renders_and_citations_are_smaller(tmp_path: Path) -> No
     assert "font-size: 0.88em" in text[citation:citation + 180]
 
 
+def test_ask_box_is_disabled_while_loading(tmp_path: Path) -> None:
+    text = _client(tmp_path, Asker(None, None)).get("/").text
+    assert 'id="ask-button"' in text
+    assert "question.disabled = true" in text
+    assert "askButton.disabled = true" in text
+    submit = text.index('addEventListener("submit"')
+    handler = text[submit:]
+    assert "if (askButton.disabled) return;" in handler
+    assert handler.index("if (askButton.disabled) return;") < handler.index("question.disabled = true")
+    assert handler.index("question.disabled = true") < handler.index("await fetch")
+    assert "question.disabled = false" in handler
+    assert "askButton.disabled = false" in handler
+    assert handler.index("finally") < handler.index("question.disabled = false")
+
+
 def test_enter_submits_the_ask_box(tmp_path: Path) -> None:
     client = _client(tmp_path, Asker(None, None))
     page = client.get("/")

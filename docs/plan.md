@@ -529,6 +529,12 @@ A live eval runs against one environment's index. The report belongs to that env
 
 Published docs and requirements.md match this.
 
+### DOCPILOT-59 — Disable the question box and Ask while an answer is loading
+
+Found Saturday 17 October 2026.
+
+When a visitor asks a question, the textarea and the Ask button stay enabled while the answer is loading. Disable both until the request finishes, then enable them again.
+
 ## Issue index
 
 | Key | Summary | Due | URL |
@@ -591,3 +597,4 @@ Published docs and requirements.md match this.
 | DOCPILOT-56 | Start the catalog summary with the uploaded set of documents | 2026-10-17 | https://nitro.atlassian.net/browse/DOCPILOT-56 |
 | DOCPILOT-57 | Finish the catalog summary auto-complete before the request times out | 2026-10-17 | https://nitro.atlassian.net/browse/DOCPILOT-57 |
 | DOCPILOT-58 | Stop scoring a fixed question file in pull-request CI | 2026-10-17 | https://nitro.atlassian.net/browse/DOCPILOT-58 |
+| DOCPILOT-59 | Disable the question box and Ask while an answer is loading | 2026-10-17 | https://nitro.atlassian.net/browse/DOCPILOT-59 |
