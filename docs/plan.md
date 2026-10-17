@@ -545,6 +545,12 @@ The citation line opens the source PDF in a new tab, at the cited page. The link
 
 The snippet under the line stays text.
 
+### DOCPILOT-61 — Show a spinner beside Ask while an answer is loading
+
+Found Saturday 17 October 2026.
+
+While an answer is loading, the question box and Ask stay disabled. A spinner sits in the empty space immediately to the right of Ask. Hide the spinner when the request finishes, including when it fails. A second submit during the wait does not start another request.
+
 ## Issue index
 
 | Key | Summary | Due | URL |
@@ -609,3 +615,4 @@ The snippet under the line stays text.
 | DOCPILOT-58 | Stop scoring a fixed question file in pull-request CI | 2026-10-17 | https://nitro.atlassian.net/browse/DOCPILOT-58 |
 | DOCPILOT-59 | Disable the question box and Ask while an answer is loading | 2026-10-17 | https://nitro.atlassian.net/browse/DOCPILOT-59 |
 | DOCPILOT-60 | Open a citation on the source page | 2026-10-17 | https://nitro.atlassian.net/browse/DOCPILOT-60 |
+| DOCPILOT-61 | Show a spinner beside Ask while an answer is loading | 2026-10-17 | https://nitro.atlassian.net/browse/DOCPILOT-61 |
