@@ -1,10 +1,11 @@
 """Public question page and POST /ask."""
 
 import logging
+import re
 from pathlib import Path
 
 from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from pydantic import BaseModel, Field
 
@@ -14,6 +15,7 @@ from docpilot.documents.service import DocumentService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+_SOURCE_ID = re.compile(r"^[A-Za-z0-9_-]{1,80}$")
 _TEMPLATES = Environment(
     loader=FileSystemLoader(Path(__file__).resolve().parent),
     autoescape=select_autoescape(["html"]),
@@ -58,6 +60,36 @@ def home(request: Request) -> HTMLResponse:
         show_summary=bool(summary.title or summary.summary or questions),
     )
     return HTMLResponse(body, headers={"Cache-Control": "no-store"})
+
+
+@router.get("/sources/{document_id}")
+def source_pdf(document_id: str, request: Request) -> Response:
+    if _SOURCE_ID.fullmatch(document_id) is None:
+        return Response(status_code=404)
+    documents = _documents(request)
+    record = documents.store.get_record(document_id)
+    data = documents.store.get_pdf(document_id) if record is not None else None
+    if record is None or data is None:
+        return Response(status_code=404)
+    filename = _pdf_filename(record.source)
+    return Response(
+        content=data,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'inline; filename="{filename}"',
+            "Cache-Control": "private",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
+
+
+def _pdf_filename(source: str) -> str:
+    name = source.replace("\\", "/").rsplit("/", 1)[-1]
+    cleaned = "".join(char if char.isalnum() or char in "._-" else "_" for char in name)
+    cleaned = cleaned.strip("._") or "document"
+    if not cleaned.lower().endswith(".pdf"):
+        cleaned = f"{cleaned}.pdf"
+    return cleaned[:120]
 
 
 @router.post("/ask")
