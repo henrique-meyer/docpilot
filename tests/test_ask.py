@@ -200,6 +200,9 @@ def test_ask_box_is_disabled_while_loading(tmp_path: Path) -> None:
     assert "question.disabled = false" in handler
     assert "askButton.disabled = false" in handler
     assert handler.index("finally") < handler.index("question.disabled = false")
+    assert 'id="ask-spinner" class="spinner hidden"' in text
+    assert handler.index('spinner.classList.remove("hidden")') < handler.index("await fetch")
+    assert handler.index("finally") < handler.index('spinner.classList.add("hidden")')
 
 
 def test_enter_submits_the_ask_box(tmp_path: Path) -> None:

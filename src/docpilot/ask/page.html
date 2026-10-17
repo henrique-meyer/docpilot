@@ -61,6 +61,17 @@
     }
     textarea:disabled { color: var(--muted); background: #f3efe6; }
     button:disabled { opacity: 0.55; cursor: not-allowed; }
+    .ask-actions { display: flex; align-items: center; gap: 12px; }
+    .spinner {
+      width: 32px;
+      height: 32px;
+      border: 3px solid #c9c0b2;
+      border-top-color: var(--navy);
+      border-radius: 50%;
+      flex: 0 0 auto;
+      animation: ask-spin 0.7s linear infinite;
+    }
+    @keyframes ask-spin { to { transform: rotate(360deg); } }
     .catalog-summary { margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
     .catalog-summary h1 { font-size: 1.25rem; line-height: 1.3; margin: 0 0 8px; }
     .catalog-summary p { margin: 0 0 8px; }
@@ -106,7 +117,10 @@
       {% endif %}
       <label for="question">Ask about the uploaded documents</label>
       <textarea id="question" name="question" maxlength="1000" required></textarea>
-      <button id="ask-button" type="submit">Ask</button>
+      <div class="ask-actions">
+        <button id="ask-button" type="submit">Ask</button>
+        <span id="ask-spinner" class="spinner hidden" role="status" aria-label="Looking through the documents"></span>
+      </div>
       <p class="disclaimer">Answers come from the uploaded documents and are informational only. Those documents are a selected set for demonstration, not a complete library on the topic, so do not treat the answers as a definitive guide.</p>
     </form>
     <p id="status" class="status hidden"></p>
@@ -171,6 +185,7 @@
     const form = document.getElementById("ask");
     const question = document.getElementById("question");
     const askButton = document.getElementById("ask-button");
+    const spinner = document.getElementById("ask-spinner");
     const status = document.getElementById("status");
     const result = document.getElementById("result");
     question.addEventListener("keydown", (event) => {
@@ -188,6 +203,7 @@
       if (askButton.disabled) return;
       question.disabled = true;
       askButton.disabled = true;
+      spinner.classList.remove("hidden");
       status.classList.remove("hidden");
       status.textContent = "Looking through the documents…";
       result.classList.add("hidden");
@@ -208,6 +224,7 @@
       } finally {
         question.disabled = false;
         askButton.disabled = false;
+        spinner.classList.add("hidden");
       }
       if (failed) return;
       const messages = {
