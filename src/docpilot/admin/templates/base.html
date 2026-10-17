@@ -653,7 +653,9 @@
           return response.text().then(function (text) {
             var payload = parseJson(text);
             if (response.status < 200 || response.status >= 300) {
-              showBanner("error", payload.message || "The request failed.");
+              var fallback = (text || "").trim();
+              if (fallback.length > 180) fallback = "";
+              showBanner("error", payload.message || fallback || "The request failed.");
               return;
             }
             applySummary(form, payload);

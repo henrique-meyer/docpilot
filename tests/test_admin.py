@@ -17,7 +17,6 @@ from docpilot.documents.models import AuditEvent, CatalogSummary, DocumentRecord
 from docpilot.documents.service import DocumentService
 from docpilot.documents.store import FileDocumentStore, MemoryDocumentStore
 from docpilot.ingest.chunk import Chunk
-from docpilot.ingest.pdftext import PageText
 from docpilot.ingest.pipeline import Ingestor, IngestResult, MemoryIndex
 from docpilot.main import create_app
 
@@ -1164,8 +1163,8 @@ def test_catalog_summary_draft_fills_the_form_and_does_not_save(
     tmp_path: Path, monkeypatch: MonkeyPatch
 ) -> None:
     monkeypatch.setattr(
-        "docpilot.documents.summary.read_pages",
-        lambda data: [PageText(1, "", "Deceased taxpayers may still need to file a return.")],
+        "docpilot.documents.summary.read_sample",
+        lambda data: "Deceased taxpayers may still need to file a return.",
     )
     store = MemoryDocumentStore()
     _ready_document(store)
@@ -1203,6 +1202,54 @@ def test_catalog_summary_draft_fills_the_form_and_does_not_save(
         "/admin/api/catalog-summary/draft",
         headers={"Accept": "application/json"},
     ).status_code == 401
+
+
+def test_catalog_summary_draft_stops_once_the_prompt_is_full(monkeypatch: MonkeyPatch) -> None:
+    from docpilot.documents.summary import PROMPT_CHARS, _excerpts
+
+    reads: list[str] = []
+
+    def sample(data: bytes) -> str:
+        reads.append(data.decode())
+        return "tax guidance " * 400
+
+    monkeypatch.setattr("docpilot.documents.summary.read_sample", sample)
+
+    class Store:
+        def get_pdf(self, doc_id: str) -> bytes:
+            return doc_id.encode()
+
+    class Service:
+        store = Store()
+
+        def list_documents(self) -> list[DocumentRecord]:
+            return [
+                DocumentRecord(
+                    id=str(number),
+                    title=f"Document {number}",
+                    source=f"{number}.pdf",
+                    year="2025",
+                    pages=40,
+                    chunk_count=1,
+                    index_bytes=1,
+                    source_bytes=1,
+                    ingested_at="2026-10-15T00:00:00+00:00",
+                    status="ready",
+                )
+                for number in range(12)
+            ]
+
+    text = _excerpts(Service())
+    assert len(reads) < 12
+    assert len(text) <= PROMPT_CHARS
+    assert "Document 0" in text
+
+
+def test_catalog_sample_reads_the_opening_and_a_middle_page() -> None:
+    from docpilot.ingest.pdftext import _sample_indexes
+
+    assert _sample_indexes(2, 3) == [0, 1]
+    assert _sample_indexes(100, 3) == [0, 1, 50]
 
 
 def test_catalog_summary_keeps_an_opening_the_model_already_wrote() -> None:

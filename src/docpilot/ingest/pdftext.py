@@ -10,6 +10,7 @@ from docpilot.ingest.chunk import PageText
 from docpilot.ingest.repair import repair_passage
 
 MAX_PAGES = 2000
+SAMPLE_PAGES = 3
 
 
 def read_pages(data: bytes) -> list[PageText]:
@@ -34,6 +35,43 @@ def read_pages(data: bytes) -> list[PageText]:
     except Exception as exc:
         raise DocumentError("not_pdf") from exc
     return pages
+
+
+def read_sample(data: bytes) -> str:
+    """Text from the opening pages and one middle page."""
+    if not data.startswith(b"%PDF-"):
+        raise DocumentError("not_pdf")
+    try:
+        reader = PdfReader(BytesIO(data))
+        if reader.is_encrypted:
+            raise DocumentError("encrypted")
+        count = len(reader.pages)
+        if count < 1:
+            raise DocumentError("not_pdf")
+        parts: list[str] = []
+        section = ""
+        for index in _sample_indexes(count, SAMPLE_PAGES):
+            raw = reader.pages[index].extract_text() or ""
+            section, body = _section_and_body(raw, section)
+            if body:
+                parts.append(body)
+    except DocumentError:
+        raise
+    except PdfReadError as exc:
+        raise DocumentError("not_pdf") from exc
+    except Exception as exc:
+        raise DocumentError("not_pdf") from exc
+    return "\n".join(parts)
+
+
+def _sample_indexes(count: int, page_limit: int) -> list[int]:
+    if count <= page_limit:
+        return list(range(count))
+    indexes = list(range(page_limit - 1))
+    middle = count // 2
+    if middle not in indexes:
+        indexes.append(middle)
+    return indexes
 
 
 def _section_and_body(raw: str, current: str) -> tuple[str, str]:

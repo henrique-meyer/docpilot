@@ -511,6 +511,12 @@ Found Saturday 17 October 2026.
 
 The admin Catalog Summary auto-complete with AI writes the summary. That summary starts with "The uploaded set of documents contains".
 
+### DOCPILOT-57 — Finish the catalog summary auto-complete before the request times out
+
+Found Saturday 17 October 2026.
+
+Auto-complete with AI on the admin Catalog Summary stays on Working and then returns stream timeout. The form is unchanged. The draft reads a short sample from each ready document and stops once the prompt is full, instead of parsing every page of every PDF on that request. It then fills the title, summary, and questions.
+
 ## Issue index
 
 | Key | Summary | Due | URL |
@@ -571,3 +577,4 @@ The admin Catalog Summary auto-complete with AI writes the summary. That summary
 | DOCPILOT-54 | Point the footer credit at hmeyer.com | 2026-10-16 | https://nitro.atlassian.net/browse/DOCPILOT-54 |
 | DOCPILOT-55 | Render answer markdown and shrink the citations | 2026-10-16 | https://nitro.atlassian.net/browse/DOCPILOT-55 |
 | DOCPILOT-56 | Start the catalog summary with the uploaded set of documents | 2026-10-17 | https://nitro.atlassian.net/browse/DOCPILOT-56 |
+| DOCPILOT-57 | Finish the catalog summary auto-complete before the request times out | 2026-10-17 | https://nitro.atlassian.net/browse/DOCPILOT-57 |
