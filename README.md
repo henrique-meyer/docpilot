@@ -21,7 +21,7 @@ DocPilot was built with an **AI-native development workflow**: AI agents do much
 1. **Requirements with Grok Bot.** A personal AI assistant helped turn the idea into detailed product and technical requirements, then iterated on them through conversation.
 2. **Planning with Cursor.** An AI coding agent turned the requirements into an architecture doc, a technical project plan, and a Jira backlog (epics and stories with DOCPILOT-N keys, linked to GitHub through smart commits).
 3. **Infrastructure with Cursor.** The agent wrote infrastructure as code and provisioned Azure resources through the Azure CLI, behind preview-and-approve gates for anything that costs money.
-4. **Implementation with Cursor.** The agent writes features against Jira stories in small PRs; CI runs tests and evals on every change.
+4. **Implementation with Cursor.** The agent writes features against Jira stories in small PRs; CI runs tests on every change.
 
 **The human in the loop.** I acted as architect, product owner, and reviewer. I set the scope and constraints (security, public-only data, a document-agnostic design), made the key technical calls (Python, Agent Framework over Semantic Kernel, Container Apps, a simple admin instead of a fixed corpus), caught gaps (an overly technical demo corpus, conflicting docs), approved every cloud change, and reviewed and merged every PR. The AI moves fast; the engineer decides what is right, safe, and worth shipping.
 
@@ -67,7 +67,7 @@ az group delete --name <resource-group>
 
 ## Eval
 
-Pull-request CI runs the golden set in self-check mode: 30 questions and 10 red-team prompts, scored against reference answers so the gate does not call Azure. `make eval` runs the live judge when both Azure endpoints are set.
+`make eval` scores the golden set against one environment's index: 30 questions and 10 red-team prompts. It runs when both Azure endpoints are set. The report belongs to that environment. The IRS questions apply only when those documents are what that environment has indexed. Pull-request CI does not run this check.
 
 | Check | Threshold |
 | --- | --- |
@@ -82,7 +82,7 @@ Retrieval is plain code: hybrid search, a limit on retrieved context, and a vers
 
 ## Status
 
-The ask API, agent, eval gate, tracing, admin catalog, and deploy workflow are on `main`. Architecture is in [docs/architecture.md](docs/architecture.md).
+The ask API, agent, tracing, admin catalog, and deploy workflow are on `main`. Architecture is in [docs/architecture.md](docs/architecture.md).
 
 ## License
 MIT

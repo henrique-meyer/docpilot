@@ -6,7 +6,7 @@ The app does not load a corpus on startup. An admin uploads PDFs. Uploaded files
 
 ## Definition of done
 
-For every story: code and tests merged through a pull request, CI green, evals at or above threshold when answering behavior changes, Bicep or docs updated when the change touches them, and the Jira story closed. Branch names, commits, and pull request titles include the key `DOCPILOT-N`.
+For every story: code and tests merged through a pull request, CI green, a live eval against one environment's index when answering behavior changes (that report belongs to that environment), Bicep or docs updated when the change touches them, and the Jira story closed. Branch names, commits, and pull request titles include the key `DOCPILOT-N`.
 
 ## Order
 
@@ -85,7 +85,7 @@ Blocked by DOCPILOT-1. Blocks DOCPILOT-12.
 
 Due Thursday 15 October 2026.
 
-DocPilot does not hard-code a corpus. The live set is whatever an admin uploads. A local seed command, when one is used, calls the same ingestion path as an admin upload. CI evals use the golden question file.
+DocPilot does not hard-code a corpus. The live set is whatever an admin uploads. A local seed command, when one is used, calls the same ingestion path as an admin upload. A live eval scores a question file only against one environment's index, and only when that file's documents are what was indexed there.
 
 Blocked by DOCPILOT-1. Blocks DOCPILOT-4.
 
@@ -125,7 +125,7 @@ Blocked by DOCPILOT-6. Blocks DOCPILOT-8 and DOCPILOT-10.
 
 Due Thursday 15 October 2026.
 
-Thirty golden questions and ten red-team prompts. The golden set includes questions that need more than one document. Metrics: correctness, citation accuracy, groundedness, red-team pass rate, latency, and tokens. Thresholds in config. Non-zero exit on failure. Markdown and JSON reports. CI runs that set.
+Thirty golden questions and ten red-team prompts. The golden set includes questions that need more than one document. Metrics: correctness, citation accuracy, groundedness, red-team pass rate, latency, and tokens. Thresholds in config. Non-zero exit on failure. Markdown and JSON reports. A live eval runs that set against one environment's index. DOCPILOT-58 removed it from pull-request CI.
 
 Blocked by DOCPILOT-7. Blocks DOCPILOT-9 and DOCPILOT-11.
 
@@ -133,7 +133,7 @@ Blocked by DOCPILOT-7. Blocks DOCPILOT-9 and DOCPILOT-11.
 
 Due Thursday 15 October 2026.
 
-GitHub Actions on pull requests: lint, typecheck, unit tests, Docker build, and the eval gate against the golden question file.
+GitHub Actions on pull requests: lint, typecheck, unit tests, the Bicep build, and the Docker build. DOCPILOT-58 removed the eval gate against the golden question file.
 
 Blocked by DOCPILOT-8. Blocks DOCPILOT-13.
 
@@ -517,6 +517,18 @@ Found Saturday 17 October 2026.
 
 Auto-complete with AI on the admin Catalog Summary stays on Working and then returns stream timeout. The form is unchanged. The draft reads a short sample from each ready document and stops once the prompt is full, instead of parsing every page of every PDF on that request. It then fills the title, summary, and questions.
 
+### DOCPILOT-58 — Stop scoring a fixed question file in pull-request CI
+
+Found Saturday 17 October 2026.
+
+The assistant answers only from documents that have been indexed and processed in a cloud environment. A pull request does not know that set, and the same image can be deployed to more than one environment. Scoring the IRS question file against itself in pull-request CI does not evaluate a deployment.
+
+Pull-request CI stops running that self-check. It keeps lint, typecheck, unit tests, the Bicep build, and the Docker build.
+
+A live eval runs against one environment's index. The report belongs to that environment. The IRS questions apply only when those documents are what that environment has indexed.
+
+Published docs and requirements.md match this.
+
 ## Issue index
 
 | Key | Summary | Due | URL |
@@ -578,3 +590,4 @@ Auto-complete with AI on the admin Catalog Summary stays on Working and then ret
 | DOCPILOT-55 | Render answer markdown and shrink the citations | 2026-10-16 | https://nitro.atlassian.net/browse/DOCPILOT-55 |
 | DOCPILOT-56 | Start the catalog summary with the uploaded set of documents | 2026-10-17 | https://nitro.atlassian.net/browse/DOCPILOT-56 |
 | DOCPILOT-57 | Finish the catalog summary auto-complete before the request times out | 2026-10-17 | https://nitro.atlassian.net/browse/DOCPILOT-57 |
+| DOCPILOT-58 | Stop scoring a fixed question file in pull-request CI | 2026-10-17 | https://nitro.atlassian.net/browse/DOCPILOT-58 |

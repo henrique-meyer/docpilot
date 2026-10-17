@@ -28,7 +28,7 @@ The agent is for a question that needs more than one lookup. It can search, open
 
 ## Evals and CI
 
-The golden set has 30 questions, including some that need more than one document, and 10 red-team prompts. The thresholds are correctness 0.80, citation accuracy 0.90, groundedness 0.80, and every red-team prompt passing. Pull-request CI runs that set in self-check mode, so the gate is tested without Azure. `make eval` is the live run. A LangChain script answers the same set for a side-by-side report. CI also lints, typechecks, runs the unit tests, and builds the image.
+The golden set has 30 questions, including some that need more than one document, and 10 red-team prompts. The thresholds are correctness 0.80, citation accuracy 0.90, groundedness 0.80, and every red-team prompt passing. Those questions apply only when those documents are what an environment has indexed. `make eval` is the live run against that environment's index, and the report belongs to that environment. A LangChain script answers the same set for a side-by-side report. Pull-request CI lints, typechecks, runs the unit tests, and builds the image. It does not score the question file.
 
 ## Observability
 
@@ -44,4 +44,4 @@ Start Compose, open the site, and set the admin password. Upload a PDF. Ask a qu
 
 ## Lessons
 
-The retrieval path stays in ordinary Python so a reviewer can read it. The agent framework is only the tool loop. The eval gate runs on every pull request, including a self-check that does not need the live index. The product never hard-codes a corpus.
+The retrieval path stays in ordinary Python so a reviewer can read it. The agent framework is only the tool loop. The assistant answers only from documents indexed in a cloud environment, so a pull-request check is not an evaluation of a deployment. The product never hard-codes a corpus.

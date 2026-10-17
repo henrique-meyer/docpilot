@@ -5,7 +5,6 @@ on:
 
 permissions:
   contents: read
-  actions: write
 
 jobs:
   check:
@@ -30,15 +29,6 @@ jobs:
           uv run ruff check src tests
           uv run mypy src
           uv run pytest
-
-      - name: Eval gate
-        run: uv run python -m docpilot.eval --set irs --self-check --report-dir eval/reports
-
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: eval-irs
-          path: eval/reports/
 
       - uses: docker/setup-buildx-action@v3
 
