@@ -1,6 +1,6 @@
 # DocPilot architecture
 
-DocPilot is a document-agnostic assistant. A visitor asks a question in a browser or over HTTP. The service answers from whatever an admin has uploaded, or, for harder questions, calls tools through Microsoft Agent Framework. Every claim is cited. An eval harness gates pull requests. The running service is a container, local or on Azure Container Apps.
+DocPilot is a document-agnostic assistant. A visitor asks a question in a browser or over HTTP. The service answers from whatever an admin has uploaded, or, for harder questions, calls tools through Microsoft Agent Framework. Every claim is cited. A live eval scores one environment's index. The running service is a container, local or on Azure Container Apps.
 
 The target date for the whole build is **Thursday 15 October 2026**. Work is one sequenced day, not a Friday–Sunday split. Source PDFs live in Blob Storage account `stdocpilotprod`, container `sources`. The resource group name is a deploy-time value, kept outside git. Local Compose uses Azurite for the same container name.
 
@@ -112,9 +112,9 @@ A separate LangChain script, `eval/langchain_baseline.py`, answers the same gold
 
 ## Evaluation
 
-The golden file holds 30 questions with expected facts and expected documents or pages. CI runs that set, and it includes questions that need more than one document. Ten red-team prompts cover prompt injection, out-of-scope questions, system-prompt extraction, and invented citations. Expected behavior is to refuse, or to answer only from the documents.
+The golden file holds 30 questions with expected facts and expected documents or pages, including questions that need more than one document. Those questions apply only when those documents are what an environment has indexed. The assistant answers only from that cloud index. Ten red-team prompts cover prompt injection, out-of-scope questions, system-prompt extraction, and invented citations. Expected behavior is to refuse, or to answer only from the documents.
 
-Metrics: answer correctness (LLM-as-judge plus key-fact match), citation accuracy, groundedness, red-team pass rate, latency, and token cost. Thresholds live in config (starting point: correctness at least 0.8, citation accuracy at least 0.9, red-team 10/10). The harness exits non-zero when a threshold fails. `make eval` runs it locally. CI runs it on pull requests and publishes a Markdown and JSON report.
+Metrics: answer correctness (LLM-as-judge plus key-fact match), citation accuracy, groundedness, red-team pass rate, latency, and token cost. Thresholds live in config (starting point: correctness at least 0.8, citation accuracy at least 0.9, red-team 10/10). The harness exits non-zero when a threshold fails. `make eval` runs it against one environment's index and writes a Markdown and JSON report for that environment. Pull-request CI does not run it. A pull request does not know the indexed set, and the same image can be deployed to more than one environment.
 
 One pull request in history must show a deliberate regression (a broken prompt or a smaller top-k) turning CI red, followed by the fix. That is the regression proof.
 
@@ -132,7 +132,7 @@ Branches, commits, and pull request titles include the Jira key `DOCPILOT-N`. Sm
 
 ## CI/CD
 
-On a pull request: lint, typecheck, unit tests, Docker image build, eval harness against the thresholds, and Bicep validation once `infra/` exists.
+On a pull request: lint, typecheck, unit tests, Docker image build, and Bicep validation once `infra/` exists.
 
 On `main`: build the image, push it to GitHub Container Registry, and deploy to Azure Container Apps through a GitHub `production` environment that requires a reviewer. The workflow file can land before any deploy runs. Running the deploy waits for an explicit owner yes.
 

@@ -20,7 +20,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--self-check",
         action="store_true",
-        help="Score the golden file against itself. CI uses this when Azure is not configured.",
+        help="Score the golden file against itself. This checks the harness. It does not call the cloud index.",
     )
     args = parser.parse_args(argv)
     settings = Settings.from_env()
