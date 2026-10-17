@@ -505,6 +505,12 @@ Answers show the model markdown as typed. Bold markers such as **stay visible** 
 
 The citations under the answer are the same size as the answer. Make those citations a little smaller than the answer.
 
+### DOCPILOT-56 — Start the catalog summary with the uploaded set of documents
+
+Found Saturday 17 October 2026.
+
+The admin Catalog Summary auto-complete with AI writes the summary. That summary starts with "The uploaded set of documents contains".
+
 ## Issue index
 
 | Key | Summary | Due | URL |
@@ -564,3 +570,4 @@ The citations under the answer are the same size as the answer. Make those citat
 | DOCPILOT-53 | Show the search index size on the usage meter | 2026-10-16 | https://nitro.atlassian.net/browse/DOCPILOT-53 |
 | DOCPILOT-54 | Point the footer credit at hmeyer.com | 2026-10-16 | https://nitro.atlassian.net/browse/DOCPILOT-54 |
 | DOCPILOT-55 | Render answer markdown and shrink the citations | 2026-10-16 | https://nitro.atlassian.net/browse/DOCPILOT-55 |
+| DOCPILOT-56 | Start the catalog summary with the uploaded set of documents | 2026-10-17 | https://nitro.atlassian.net/browse/DOCPILOT-56 |
