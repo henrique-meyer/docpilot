@@ -535,6 +535,16 @@ Found Saturday 17 October 2026.
 
 When a visitor asks a question, the textarea and the Ask button stay enabled while the answer is loading. Disable both until the request finishes, then enable them again.
 
+### DOCPILOT-60 — Open a citation on the source page
+
+Found Saturday 17 October 2026.
+
+Each citation under an answer names the document, the section, the page, and the year tag. The year is only a tag. Take it off the citation line. When the year matters, it is already in the document title.
+
+The citation line opens the source PDF in a new tab, at the cited page. The link goes through the app, which reads the file from storage. The storage address stays private.
+
+The snippet under the line stays text.
+
 ## Issue index
 
 | Key | Summary | Due | URL |
@@ -598,3 +608,4 @@ When a visitor asks a question, the textarea and the Ask button stay enabled whi
 | DOCPILOT-57 | Finish the catalog summary auto-complete before the request times out | 2026-10-17 | https://nitro.atlassian.net/browse/DOCPILOT-57 |
 | DOCPILOT-58 | Stop scoring a fixed question file in pull-request CI | 2026-10-17 | https://nitro.atlassian.net/browse/DOCPILOT-58 |
 | DOCPILOT-59 | Disable the question box and Ask while an answer is loading | 2026-10-17 | https://nitro.atlassian.net/browse/DOCPILOT-59 |
+| DOCPILOT-60 | Open a citation on the source page | 2026-10-17 | https://nitro.atlassian.net/browse/DOCPILOT-60 |

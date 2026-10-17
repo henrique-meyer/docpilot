@@ -69,6 +69,7 @@ def _citation(hit: Hit) -> dict[str, object]:
     if len(snippet) > SNIPPET_CHARS:
         snippet = snippet[: SNIPPET_CHARS - 1].rstrip() + "…"
     citation: dict[str, object] = {
+        "document_id": hit.document_id,
         "doc": hit.title,
         "section": hit.section,
         "page": hit.page,

@@ -4,6 +4,7 @@ from fastapi.testclient import TestClient
 
 from docpilot.ask.service import Asker
 from docpilot.config import Settings
+from docpilot.documents.models import DocumentRecord
 from docpilot.documents.store import MemoryDocumentStore
 from docpilot.main import create_app
 from docpilot.retrieve.context import Hit
@@ -78,6 +79,7 @@ def test_ask_returns_grounded_citations(tmp_path: Path) -> None:
     assert body["answer"] == "The deduction requires exclusive use."
     assert body["citations"] == [
         {
+            "document_id": "doc",
             "doc": "Pub 587",
             "section": "Home office",
             "page": 4,
@@ -131,6 +133,47 @@ def test_daily_token_cap_returns_the_demo_message(tmp_path: Path) -> None:
     second = client.post("/ask", json={"question": "home office"})
     assert second.status_code == 429
     assert second.json()["answer"] == "demo limit reached"
+
+
+def test_citation_line_links_to_the_source_page(tmp_path: Path) -> None:
+    text = _client(tmp_path, Asker(None, None)).get("/").text
+    assert "citation.year" not in text
+    assert "/sources/${encodeURIComponent(documentId)}" in text
+    assert "#page=" in text
+    assert 'target = "_blank"' in text
+    assert 'rel = "noopener"' in text
+    assert "snippet.textContent" in text
+
+
+def test_source_pdf_comes_from_the_app(tmp_path: Path) -> None:
+    store = MemoryDocumentStore()
+    document_id = "a" * 32
+    store.put_record(
+        DocumentRecord(
+            id=document_id,
+            title="2025 Publication 502",
+            source="p502.pdf",
+            year="2025",
+            pages=27,
+            chunk_count=1,
+            index_bytes=10,
+            source_bytes=8,
+            ingested_at=None,
+            status="ready",
+        )
+    )
+    store.put_pdf(document_id, b"%PDF-1.4 test")
+    client = TestClient(create_app(_settings(tmp_path), store, Asker(None, None)))
+    response = client.get(f"/sources/{document_id}")
+    assert response.status_code == 200
+    assert response.content == b"%PDF-1.4 test"
+    assert response.headers["content-type"].startswith("application/pdf")
+    assert response.headers["content-disposition"] == 'inline; filename="p502.pdf"'
+    assert "blob.core" not in response.text
+    assert client.get("/sources/missing-document").status_code == 404
+    assert client.get("/sources/../secret").status_code == 404
+    store.delete_pdf(document_id)
+    assert client.get(f"/sources/{document_id}").status_code == 404
 
 
 def test_answer_markdown_renders_and_citations_are_smaller(tmp_path: Path) -> None:

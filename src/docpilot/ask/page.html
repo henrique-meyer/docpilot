@@ -80,6 +80,7 @@
     }
     .citation p { margin: 0.35em 0 0; }
     .citation strong { display: block; }
+    .citation a { color: var(--navy); }
     .hidden { display: none; }
     .status { margin-top: 12px; color: var(--muted); }
   </style>
@@ -222,8 +223,20 @@
         const block = document.createElement("div");
         block.className = "citation";
         const title = document.createElement("strong");
-        const year = citation.year ? `, ${citation.year}` : "";
-        title.textContent = `${citation.doc} — ${citation.section}, p. ${citation.page}${year}`;
+        const label = `${citation.doc} — ${citation.section}, p. ${citation.page}`;
+        const pageNumber = Number(citation.page);
+        const fragment = Number.isInteger(pageNumber) && pageNumber > 0 ? `#page=${pageNumber}` : "";
+        const documentId = citation.document_id || "";
+        if (documentId) {
+          const link = document.createElement("a");
+          link.href = `/sources/${encodeURIComponent(documentId)}${fragment}`;
+          link.target = "_blank";
+          link.rel = "noopener";
+          link.textContent = label;
+          title.appendChild(link);
+        } else {
+          title.textContent = label;
+        }
         const snippet = document.createElement("p");
         snippet.textContent = citation.snippet || "";
         block.appendChild(title);
