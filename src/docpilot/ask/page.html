@@ -243,7 +243,10 @@
         const block = document.createElement("div");
         block.className = "citation";
         const title = document.createElement("strong");
-        const label = `${citation.doc} — ${citation.section}, p. ${citation.page}`;
+        const section = (citation.section || "").trim();
+        const label = section
+          ? `${citation.doc} — ${section}, p. ${citation.page}`
+          : `${citation.doc}, p. ${citation.page}`;
         const pageNumber = Number(citation.page);
         const fragment = Number.isInteger(pageNumber) && pageNumber > 0 ? `#page=${pageNumber}` : "";
         const documentId = citation.document_id || "";
