@@ -1,7 +1,5 @@
 # docpilot
-AI document assistant in **Python**: Retrieval-Augmented Generation (RAG) Q&A with citations and a tool-using agent built on **Microsoft Agent Framework** (the successor to Semantic Kernel), **Microsoft Foundry**, and **Azure AI Search**. It ships with an evaluation harness, Docker, and CI/CD, and deploys to **Azure Container Apps**.
-
-Live demo: deployed from `main`. The hostname is configured outside this repo.
+AI document assistant that answers questions about an uploaded set of documents. Anyone can ask a question and get an answer grounded in those documents, with a citation for every claim.
 
 ## What it does
 - Upload any set of documents (PDF) through a password-protected admin page; DocPilot chunks, embeds, and indexes them.
