@@ -14,7 +14,7 @@ from docpilot.documents.models import (
     DocumentRecord,
 )
 from docpilot.documents.service import DocumentService
-from docpilot.ingest.pdftext import read_pages
+from docpilot.ingest.pdftext import read_sample
 
 EXCERPT_CHARS = 1800
 PROMPT_CHARS = 12000
@@ -60,13 +60,18 @@ def _excerpts(service: DocumentService) -> str:
         raise DocumentError("no_documents")
     blocks: list[str] = []
     readable = False
+    used = 0
     for record in ready:
         excerpt = _excerpt(_document_text(service, record))
         if excerpt:
             readable = True
         title = record.title or record.source
         year = record.year or ""
-        blocks.append(f"Title: {title}\nYear: {year}\nText: {excerpt}")
+        block = f"Title: {title}\nYear: {year}\nText: {excerpt}"
+        blocks.append(block)
+        used += len(block) + 2
+        if used >= PROMPT_CHARS:
+            break
     if not readable:
         raise DocumentError("unreadable")
     return "\n\n".join(blocks)[:PROMPT_CHARS]
@@ -77,10 +82,9 @@ def _document_text(service: DocumentService, record: DocumentRecord) -> str:
     if not data:
         return ""
     try:
-        pages = read_pages(data)
+        return read_sample(data)
     except DocumentError:
         return ""
-    return "\n".join(page.text for page in pages)
 
 
 def _excerpt(text: str) -> str:
