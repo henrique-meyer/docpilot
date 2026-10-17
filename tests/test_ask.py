@@ -138,6 +138,8 @@ def test_daily_token_cap_returns_the_demo_message(tmp_path: Path) -> None:
 def test_citation_line_links_to_the_source_page(tmp_path: Path) -> None:
     text = _client(tmp_path, Asker(None, None)).get("/").text
     assert "citation.year" not in text
+    assert "citation.doc} — ${section}, p. ${citation.page}" in text
+    assert "citation.doc}, p. ${citation.page}" in text
     assert "/sources/${encodeURIComponent(documentId)}" in text
     assert "#page=" in text
     assert 'target = "_blank"' in text
