@@ -178,6 +178,23 @@ def test_source_pdf_comes_from_the_app(tmp_path: Path) -> None:
     assert client.get(f"/sources/{document_id}").status_code == 404
 
 
+def test_pages_load_google_analytics_only_for_a_measurement_id(tmp_path: Path) -> None:
+    plain = _client(tmp_path, Asker(None, None))
+    for path in ("/", "/documents", "/admin/login"):
+        assert "googletagmanager.com" not in plain.get(path).text
+
+    tagged = _client(tmp_path, Asker(None, None), ga_measurement_id="G-TEST1234")
+    for path in ("/", "/documents", "/admin/login"):
+        text = tagged.get(path).text
+        assert 'src="https://www.googletagmanager.com/gtag/js?id=G-TEST1234"' in text
+        assert "gtag('config', 'G-TEST1234')" in text
+
+    rejected = _client(tmp_path, Asker(None, None), ga_measurement_id='G-BAD"><script>')
+    page = rejected.get("/").text
+    assert "googletagmanager.com" not in page
+    assert "G-BAD" not in page
+
+
 def test_answer_markdown_renders_and_citations_are_smaller(tmp_path: Path) -> None:
     page = _client(tmp_path, Asker(None, None)).get("/")
     text = page.text

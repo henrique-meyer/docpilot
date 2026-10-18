@@ -9,6 +9,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, Response
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from pydantic import BaseModel, Field
 
+from docpilot.analytics import analytics_head
 from docpilot.ask.limits import DemoLimitReached, DemoLimits, QuestionTooLong, RateLimited
 from docpilot.ask.service import DEMO_LIMIT, Asker
 from docpilot.documents.service import DocumentService
@@ -20,6 +21,7 @@ _TEMPLATES = Environment(
     loader=FileSystemLoader(Path(__file__).resolve().parent),
     autoescape=select_autoescape(["html"]),
 )
+_TEMPLATES.globals["analytics_head"] = analytics_head
 
 
 class AskBody(BaseModel):

@@ -21,6 +21,7 @@ from docpilot.admin.auth import (
     write_session,
 )
 from docpilot.admin.bootstrap import MIN_PASSWORD_CHARS, AdminLogin
+from docpilot.analytics import analytics_head
 from docpilot.config import Settings
 from docpilot.documents.errors import MESSAGES, DocumentError
 from docpilot.documents.fetch import download_pdf
@@ -32,6 +33,7 @@ _TEMPLATES = Environment(
     loader=FileSystemLoader(Path(__file__).resolve().parent / "templates"),
     autoescape=select_autoescape(["html"]),
 )
+_TEMPLATES.globals["analytics_head"] = analytics_head
 
 NOTICES = {
     "upload_queued": "The file is stored. Indexing continues until the status is ready.",

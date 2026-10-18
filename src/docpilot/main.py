@@ -5,7 +5,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 
 from docpilot.admin.auth import LoginGuard
@@ -13,6 +13,7 @@ from docpilot.admin.bootstrap import AdminLogin, build_login_store
 from docpilot.admin.routes import router as admin_router
 from docpilot.agent.routes import router as agent_router
 from docpilot.agent.service import Pilot, build_pilot
+from docpilot.analytics import bind_measurement_id, reset_measurement_id
 from docpilot.ask.limits import DemoLimits
 from docpilot.ask.routes import router as ask_router
 from docpilot.ask.service import Asker, build_chat
@@ -86,6 +87,15 @@ def create_app(
     resolved_asker = asker or Asker(build_retriever(resolved), build_chat(resolved))
     app.state.asker = resolved_asker
     app.state.pilot = pilot or build_pilot(resolved, resolved_asker.retriever)
+
+    @app.middleware("http")
+    async def bind_google_analytics(request: Request, call_next):  # type: ignore[no-untyped-def]
+        token = bind_measurement_id(request.app.state.settings.ga_measurement_id)
+        try:
+            return await call_next(request)
+        finally:
+            reset_measurement_id(token)
+
     app.include_router(ask_router)
     app.include_router(agent_router)
     app.include_router(admin_router)

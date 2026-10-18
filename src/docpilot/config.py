@@ -6,6 +6,8 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
+from docpilot.analytics import valid_measurement_id
+
 INDEX_LIMIT_BYTES = 50 * 1024 * 1024
 MAX_UPLOAD_BYTES = 25 * 1024 * 1024
 DEFAULT_CHUNK_TOKENS = 700
@@ -89,6 +91,7 @@ class Settings:
     otlp_endpoint: str = ""
     appinsights_connection_string: str = ""
     otel_sample_ratio: float = 1.0
+    ga_measurement_id: str = ""
 
     @property
     def admin_configured(self) -> bool:
@@ -136,4 +139,7 @@ class Settings:
                 "APPLICATIONINSIGHTS_CONNECTION_STRING", ""
             ).strip(),
             otel_sample_ratio=_float("DOCPILOT_OTEL_SAMPLE_RATIO", 1.0),
+            ga_measurement_id=valid_measurement_id(
+                os.environ.get("DOCPILOT_GA_MEASUREMENT_ID", "")
+            ),
         )

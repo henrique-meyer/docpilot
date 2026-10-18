@@ -27,6 +27,9 @@ param customDomainName string = ''
 @description('Managed certificate resource ID for the custom hostname. Empty leaves the binding out of this deploy.')
 param customDomainCertificateId string = ''
 
+@description('Google Analytics 4 measurement ID. Empty leaves the tag off. Keep the value in the gitignored parameter file.')
+param gaMeasurementId string = ''
+
 var tags = {
   project: 'docpilot'
   environment: 'prod'
@@ -287,6 +290,10 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
             {
               name: 'DOCPILOT_COOKIE_SECURE'
               value: 'true'
+            }
+            {
+              name: 'DOCPILOT_GA_MEASUREMENT_ID'
+              value: gaMeasurementId
             }
           ]
           probes: [

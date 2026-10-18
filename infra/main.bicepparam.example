@@ -10,3 +10,4 @@ param targetPort = 8000
 param healthPath = '/health'
 param customDomainName = ''
 param customDomainCertificateId = ''
+param gaMeasurementId = ''
