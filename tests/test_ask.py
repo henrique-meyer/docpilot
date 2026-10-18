@@ -178,6 +178,22 @@ def test_source_pdf_comes_from_the_app(tmp_path: Path) -> None:
     assert client.get(f"/sources/{document_id}").status_code == 404
 
 
+def test_public_pages_share_the_logo(tmp_path: Path) -> None:
+    client = _client(tmp_path, Asker(None, None))
+    home = client.get("/").text
+    documents = client.get("/documents").text
+    image = "https://docpilot.hmeyer.dev/assets/logo.png"
+    assert f'<meta property="og:image" content="{image}">' in home
+    assert f'<meta property="og:image" content="{image}">' in documents
+    assert '<meta property="og:title" content="DocPilot">' in home
+    assert 'rel="canonical" href="https://docpilot.hmeyer.dev/"' in home
+    assert '<meta property="og:title" content="Documents · DocPilot">' in documents
+    assert 'rel="canonical" href="https://docpilot.hmeyer.dev/documents"' in documents
+    logo = client.get("/assets/logo.png")
+    assert logo.status_code == 200
+    assert logo.headers["content-type"].startswith("image/png")
+
+
 def test_pages_load_google_analytics_only_for_a_measurement_id(tmp_path: Path) -> None:
     plain = _client(tmp_path, Asker(None, None))
     for path in ("/", "/documents", "/admin/login"):

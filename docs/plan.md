@@ -577,6 +577,12 @@ Found Sunday 18 October 2026.
 
 Search titles, descriptions, and the public URL list are written down in `seo.md` so they can be applied again when a page changes. That file is local, like `requirements.md` and `infrastructure.md`. `.gitignore` lists `/seo.md` so it is not published.
 
+### DOCPILOT-66 — Show the logo when the site is shared
+
+Found Sunday 18 October 2026.
+
+Sharing https://docpilot.hmeyer.dev/ in WhatsApp shows a preview with no icon. WhatsApp reads the Open Graph image. The public HTML pages send that image as the existing logo PNG at an absolute https URL. If the current PNG is too small for the preview, export a larger PNG from `assets/logo.svg`. Do not draw a new mark. The ask page and the documents page both get the tags. Titles and descriptions describe DocPilot and do not name the uploaded documents.
+
 ## Issue index
 
 | Key | Summary | Due | URL |
@@ -646,3 +652,4 @@ Search titles, descriptions, and the public URL list are written down in `seo.md
 | DOCPILOT-63 | Drop the blank section from a citation line | 2026-10-17 | https://nitro.atlassian.net/browse/DOCPILOT-63 |
 | DOCPILOT-64 | Add Google Analytics to the pages | 2026-10-17 | https://nitro.atlassian.net/browse/DOCPILOT-64 |
 | DOCPILOT-65 | Keep the SEO instructions out of git | 2026-10-18 | https://nitro.atlassian.net/browse/DOCPILOT-65 |
+| DOCPILOT-66 | Show the logo when the site is shared | 2026-10-18 | https://nitro.atlassian.net/browse/DOCPILOT-66 |

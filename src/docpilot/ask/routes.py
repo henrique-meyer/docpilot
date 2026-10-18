@@ -13,6 +13,7 @@ from docpilot.analytics import analytics_head
 from docpilot.ask.limits import DemoLimitReached, DemoLimits, QuestionTooLong, RateLimited
 from docpilot.ask.service import DEMO_LIMIT, Asker
 from docpilot.documents.service import DocumentService
+from docpilot.share import share_head
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -22,6 +23,7 @@ _TEMPLATES = Environment(
     autoescape=select_autoescape(["html"]),
 )
 _TEMPLATES.globals["analytics_head"] = analytics_head
+_TEMPLATES.globals["share_head"] = share_head
 
 
 class AskBody(BaseModel):
