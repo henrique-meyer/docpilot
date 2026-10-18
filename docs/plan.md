@@ -571,6 +571,12 @@ The HTML pages load Google Analytics 4 when a measurement ID is set. The ID come
 
 The measurement ID is still needed before the live site can send hits.
 
+### DOCPILOT-65 — Keep the SEO instructions out of git
+
+Found Sunday 18 October 2026.
+
+Search titles, descriptions, and the public URL list are written down in `seo.md` so they can be applied again when a page changes. That file is local, like `requirements.md` and `infrastructure.md`. `.gitignore` lists `/seo.md` so it is not published.
+
 ## Issue index
 
 | Key | Summary | Due | URL |
@@ -639,3 +645,4 @@ The measurement ID is still needed before the live site can send hits.
 | DOCPILOT-62 | Add a View Documents page | 2026-10-17 | https://nitro.atlassian.net/browse/DOCPILOT-62 |
 | DOCPILOT-63 | Drop the blank section from a citation line | 2026-10-17 | https://nitro.atlassian.net/browse/DOCPILOT-63 |
 | DOCPILOT-64 | Add Google Analytics to the pages | 2026-10-17 | https://nitro.atlassian.net/browse/DOCPILOT-64 |
+| DOCPILOT-65 | Keep the SEO instructions out of git | 2026-10-18 | https://nitro.atlassian.net/browse/DOCPILOT-65 |
