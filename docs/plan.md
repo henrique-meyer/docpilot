@@ -563,6 +563,14 @@ Found Saturday 17 October 2026.
 
 The citation line is "document — section, p. page". When the section is empty the page shows "2025 Publication 525 — , p. 36". Omit the em dash, the blank section, and that comma when there is no section, so the line is "2025 Publication 525, p. 36". When a section is present, keep "Title — Section, p. N".
 
+### DOCPILOT-64 — Add Google Analytics to the pages
+
+Found Saturday 17 October 2026.
+
+The HTML pages load Google Analytics 4 when a measurement ID is set. The ID comes from the environment and is not committed. With no ID, the pages do not load the script.
+
+The measurement ID is still needed before the live site can send hits.
+
 ## Issue index
 
 | Key | Summary | Due | URL |
@@ -630,3 +638,4 @@ The citation line is "document — section, p. page". When the section is empty 
 | DOCPILOT-61 | Show a spinner beside Ask while an answer is loading | 2026-10-17 | https://nitro.atlassian.net/browse/DOCPILOT-61 |
 | DOCPILOT-62 | Add a View Documents page | 2026-10-17 | https://nitro.atlassian.net/browse/DOCPILOT-62 |
 | DOCPILOT-63 | Drop the blank section from a citation line | 2026-10-17 | https://nitro.atlassian.net/browse/DOCPILOT-63 |
+| DOCPILOT-64 | Add Google Analytics to the pages | 2026-10-17 | https://nitro.atlassian.net/browse/DOCPILOT-64 |

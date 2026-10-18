@@ -159,6 +159,7 @@ cp .env.example .env
 | `ADMIN_PASSWORD_HASH` | The `admin-password-hash` secret. Empty uses the first-visitor password. |
 | `SESSION_SECRET` | The `session-secret` secret. Empty until a password is saved, or required when the hash is set. |
 | `APPLICATIONINSIGHTS_CONNECTION_STRING` | The connection string from `appInsightsName`. Empty skips Azure Monitor. |
+| `DOCPILOT_GA_MEASUREMENT_ID` | Google Analytics 4 measurement ID, such as `G-XXXXXXXXXX`. Empty skips the tag. Copy it into the container app environment so the live site sends hits. |
 | `DOCPILOT_COOKIE_SECURE` | Empty or `false` for local HTTP. `true` behind HTTPS. |
 
 The other names in `.env.example` have defaults: question length, rate limit, daily token cap, retrieval sizes, eval thresholds, and the agent step limit.
