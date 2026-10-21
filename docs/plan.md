@@ -583,6 +583,18 @@ Found Sunday 18 October 2026.
 
 Sharing https://docpilot.hmeyer.dev/ in WhatsApp shows a preview with no icon. WhatsApp reads the Open Graph image. The public HTML pages send that image as the existing logo PNG at an absolute https URL. If the current PNG is too small for the preview, export a larger PNG from `assets/logo.svg`. Do not draw a new mark. The ask page and the documents page both get the tags. Titles and descriptions describe DocPilot and do not name the uploaded documents.
 
+### DOCPILOT-67 — Keep private files out of the public checkout
+
+Found Tuesday 20 October 2026.
+
+Private notes and local secret files stay outside this checkout. The gitignore still lists `requirements.md`, `infrastructure.md`, `seo.md`, `AGENTS.md`, `infra/main.json`, `infra/main.bicepparam`, `.env`, and `eval/reports/`.
+
+The app loads a dotenv file from `DOCPILOT_ENV_FILE` when that variable is set. Otherwise it loads `.env` from the working directory. Existing environment variables still win. A missing file changes nothing.
+
+Deploy does not read those files. Azure login uses the GitHub Actions secrets. The admin password hash and session secret stay in Key Vault or a Container Apps secret.
+
+The setup guide says a filled `.env` or parameter file can live outside this checkout.
+
 ## Issue index
 
 | Key | Summary | Due | URL |
@@ -653,3 +665,4 @@ Sharing https://docpilot.hmeyer.dev/ in WhatsApp shows a preview with no icon. W
 | DOCPILOT-64 | Add Google Analytics to the pages | 2026-10-17 | https://nitro.atlassian.net/browse/DOCPILOT-64 |
 | DOCPILOT-65 | Keep the SEO instructions out of git | 2026-10-18 | https://nitro.atlassian.net/browse/DOCPILOT-65 |
 | DOCPILOT-66 | Show the logo when the site is shared | 2026-10-18 | https://nitro.atlassian.net/browse/DOCPILOT-66 |
+| DOCPILOT-67 | Keep private files out of the public checkout | 2026-10-20 | https://nitro.atlassian.net/browse/DOCPILOT-67 |

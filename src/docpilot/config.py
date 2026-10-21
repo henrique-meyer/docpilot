@@ -15,12 +15,18 @@ DEFAULT_OVERLAP_TOKENS = 80
 
 
 def load_dotenv(path: Path | None = None) -> None:
-    """Fill missing environment variables from a local .env file.
+    """Fill missing environment variables from a local dotenv file.
 
     Existing variables win, so a shell or a test can override the file.
     Values are never logged. The file stays out of git.
+    ``DOCPILOT_ENV_FILE`` points at a dotenv file outside this checkout.
+    Otherwise the file is ``.env`` in the working directory.
     """
-    env_file = path if path is not None else Path.cwd() / ".env"
+    if path is not None:
+        env_file = path
+    else:
+        configured = os.environ.get("DOCPILOT_ENV_FILE", "").strip()
+        env_file = Path(configured) if configured else Path.cwd() / ".env"
     if not env_file.is_file():
         return
     for raw_line in env_file.read_text(encoding="utf-8").splitlines():

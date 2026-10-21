@@ -105,6 +105,7 @@ def _wait_record(
 
 def test_dotenv_fills_only_missing_names(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
     monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("DOCPILOT_ENV_FILE", raising=False)
     monkeypatch.setenv("ADMIN_PASSWORD_HASH", "already-set")
     monkeypatch.delenv("SESSION_SECRET", raising=False)
     monkeypatch.delenv("AZURE_STORAGE_CONTAINER", raising=False)
@@ -118,6 +119,27 @@ def test_dotenv_fills_only_missing_names(tmp_path: Path, monkeypatch: MonkeyPatc
     assert settings.storage_container == "sources"
     os.environ.pop("SESSION_SECRET", None)
     os.environ.pop("AZURE_STORAGE_CONTAINER", None)
+
+
+def test_dotenv_reads_docpilot_env_file(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("SESSION_SECRET", raising=False)
+    outside = tmp_path / "outside.env"
+    outside.write_text("SESSION_SECRET=from-outside\n", encoding="utf-8")
+    monkeypatch.setenv("DOCPILOT_ENV_FILE", str(outside))
+    settings = Settings.from_env()
+    assert settings.session_secret == "from-outside"
+    os.environ.pop("SESSION_SECRET", None)
+
+
+def test_dotenv_missing_file_leaves_the_environment_unchanged(
+    tmp_path: Path, monkeypatch: MonkeyPatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("SESSION_SECRET", raising=False)
+    monkeypatch.setenv("DOCPILOT_ENV_FILE", str(tmp_path / "missing.env"))
+    settings = Settings.from_env()
+    assert settings.session_secret == ""
 
 
 def test_health_stays_public(tmp_path: Path) -> None:
