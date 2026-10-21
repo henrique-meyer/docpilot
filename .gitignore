@@ -219,7 +219,8 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
-# Local planning inputs (not published)
+# Private notes and local secret files stay outside this checkout.
+# These names stay ignored so a copy dropped here is still not published.
 /requirements.md
 /infrastructure.md
 /AGENTS.md

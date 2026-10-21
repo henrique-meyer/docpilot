@@ -1,7 +1,8 @@
 using 'main.bicep'
 
 // Copy to infra/main.bicepparam and fill the private values there.
-// That file is gitignored. Do not put the subscription, domain, or alert email in git.
+// That file is gitignored. It can live outside this checkout.
+// Do not put the subscription, domain, or alert email in git.
 
 param location = 'eastus2'
 param searchLocation = 'eastus'

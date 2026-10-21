@@ -126,7 +126,7 @@ Locally, Jaeger runs in Docker Compose. In Azure, traces export to Application I
 
 ## Engineering
 
-Python 3.12, `uv` with a lockfile, `ruff` for lint and format, `mypy` for types, `pytest` for chunking, retrieval, prompt building, tool functions, admin auth, delete, and replace. Config is environment variables. `.env.example` is committed. `.env` is not. No secrets in git.
+Python 3.12, `uv` with a lockfile, `ruff` for lint and format, `mypy` for types, `pytest` for chunking, retrieval, prompt building, tool functions, admin auth, delete, and replace. Config is environment variables. `.env.example` is committed. `.env` is not. `DOCPILOT_ENV_FILE` can point at a dotenv file outside this checkout. No secrets in git.
 
 Branches, commits, and pull request titles include the Jira key `DOCPILOT-N`. Smart commits such as `DOCPILOT-12 #comment ...` are fine. Pull requests stay small.
 

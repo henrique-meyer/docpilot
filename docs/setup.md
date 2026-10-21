@@ -144,7 +144,7 @@ A local `az login` user who uploads documents or calls `/ask` needs the same Fou
 cp .env.example .env
 ```
 
-`.env` is gitignored. Fill it with your names:
+`.env` is gitignored. Fill it with your names. To keep that filled file outside this checkout, set `DOCPILOT_ENV_FILE` to its path. The app reads that file instead of `.env`.
 
 | Variable | Value |
 | --- | --- |
@@ -164,7 +164,7 @@ cp .env.example .env
 
 The other names in `.env.example` have defaults: question length, rate limit, daily token cap, retrieval sizes, eval thresholds, and the agent step limit.
 
-Run the app from the repo root and it loads `.env`. Existing environment variables win over the file.
+Run the app from the repo root. It loads `DOCPILOT_ENV_FILE` when that variable is set, and otherwise `.env`. Existing environment variables win over the file.
 
 `docker compose up --build` starts the API, Azurite, and Jaeger without this file. That process can serve pages and accept an admin upload into Azurite. Ask, the agent, and ingest against your Azure resources need the file inside the API container. Add `env_file: .env` under the `api` service, as described in [docker.md](docker.md). The Compose `environment` block still wins for Jaeger, the cookie flag, and the Azurite connection string.
 
