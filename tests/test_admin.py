@@ -210,6 +210,8 @@ def test_admin_pages_use_the_logo_as_favicon(tmp_path: Path) -> None:
     assert icon.status_code == 200
     assert "svg" in icon.headers["content-type"]
     assert b"<svg" in icon.content
+    assert b"#F6C43A" in icon.content
+    assert b"#E0940F" in icon.content
 
 
 def test_anonymous_admin_is_rejected(tmp_path: Path) -> None:

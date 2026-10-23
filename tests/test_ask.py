@@ -183,7 +183,7 @@ def test_public_pages_share_the_logo(tmp_path: Path) -> None:
     client = _client(tmp_path, Asker(None, None))
     home = client.get("/").text
     documents = client.get("/documents").text
-    image = "https://docpilot.hmeyer.dev/assets/logo.png?v=2"
+    image = "https://docpilot.hmeyer.dev/assets/logo.png?v=3"
     assert f'<meta property="og:image" content="{image}">' in home
     assert f'<meta property="og:image" content="{image}">' in documents
     assert f'<meta name="twitter:image" content="{image}">' in home
@@ -205,6 +205,18 @@ _YELLOW_SHA256 = {
     "logo-yellow.png": "88e8cc4b06f3a65063593acff6bdb6cb1f46338ea28f113a6b7aacd4c38a0f7b",
     "logo-mark-yellow.png": "f180916630ff6c3f11040a95c93ad2df7239dda771a950d6d9041472683c8147",
 }
+_SILVER_SHA256 = {
+    "logo-silver.svg": "b74727f06cfe9645aca39cb189a825efb658c0f6ba23e723b3cce5c7b3b49fd4",
+    "logo-mark-silver.svg": "d698f4ad8883963a580408ff736b7e5ea615058f4c1c8a024d1e41cb3d0cf6e6",
+    "logo-silver.png": "51e120da23c9e2a21950f23e85dc3e0ee595145d0d915994a185e7e48eca52ef",
+    "logo-mark-silver.png": "257e99edeaa266736304cb6a7b42cb8a67c01e27b4d845f15ad2cb1e2b48f7ec",
+}
+_ACTIVE_MATCHES_YELLOW = {
+    "logo.svg": "logo-yellow.svg",
+    "logo-mark.svg": "logo-mark-yellow.svg",
+    "logo.png": "logo-yellow.png",
+    "logo-mark.png": "logo-mark-yellow.png",
+}
 
 
 def _png_size(data: bytes) -> tuple[int, int]:
@@ -213,25 +225,31 @@ def _png_size(data: bytes) -> tuple[int, int]:
     return int.from_bytes(data[16:20], "big"), int.from_bytes(data[20:24], "big")
 
 
-def test_logo_plane_is_flat_silver_and_yellow_copies_stay() -> None:
+def test_logo_plane_is_yellow_and_saved_copies_stay() -> None:
     for name in ("logo.svg", "logo-mark.svg"):
         text = (_ASSETS / name).read_text(encoding="utf-8")
-        assert "#C9CED6" in text
-        assert "#8A929E" in text
-        assert "#F6C43A" not in text
-        assert "#E0940F" not in text
+        assert "#F6C43A" in text
+        assert "#E0940F" in text
+        assert "#C9CED6" not in text
+        assert "#8A929E" not in text
         assert "gradient" not in text.lower()
         assert "#F4F0E6" in text
         assert "#E4D8C4" in text
     assert "#0C2340" in (_ASSETS / "logo.svg").read_text(encoding="utf-8")
     assert "#CDBFA8" in (_ASSETS / "logo-mark.svg").read_text(encoding="utf-8")
+    for active, yellow in _ACTIVE_MATCHES_YELLOW.items():
+        assert (_ASSETS / active).read_bytes() == (_ASSETS / yellow).read_bytes()
     assert _png_size((_ASSETS / "logo.png").read_bytes()) == (1024, 1024)
     assert _png_size((_ASSETS / "logo-mark.png").read_bytes()) == (576, 672)
-    for name, digest in _YELLOW_SHA256.items():
-        data = (_ASSETS / name).read_bytes()
-        assert hashlib.sha256(data).hexdigest() == digest
-        if name.endswith(".png"):
-            assert _png_size(data) == ((1024, 1024) if "mark" not in name else (576, 672))
+    for saved in (_YELLOW_SHA256, _SILVER_SHA256):
+        for name, digest in saved.items():
+            data = (_ASSETS / name).read_bytes()
+            assert hashlib.sha256(data).hexdigest() == digest
+            if name.endswith(".png"):
+                assert _png_size(data) == ((1024, 1024) if "mark" not in name else (576, 672))
+            else:
+                text = data.decode("utf-8")
+                assert "gradient" not in text.lower()
 
 
 def test_pages_load_google_analytics_only_for_a_measurement_id(tmp_path: Path) -> None:
