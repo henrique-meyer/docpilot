@@ -5,7 +5,7 @@ from __future__ import annotations
 from markupsafe import Markup
 
 _ORIGIN = "https://docpilot.hmeyer.dev"
-_IMAGE = f"{_ORIGIN}/assets/logo.png?v=2"
+_IMAGE = f"{_ORIGIN}/assets/logo.png?v=3"
 _PAGES = {
     "/": (
         "DocPilot",
